@@ -72,7 +72,7 @@ jobs:
           find node_modules/electron -maxdepth 3 -name Electron.app -o -name electron
 
       - name: Build macOS application
-        run: npx electron-builder --mac --arm64
+        run: npx electron-builder --mac --arm64 --publish never
 
       - name: Upload installers
         uses: actions/upload-artifact@v7
