@@ -64,6 +64,13 @@ jobs:
 
           rm -rf "$ICONSET"
 
+      - name: Inspect Castlabs Electron distribution
+        run: |
+          node -p "require('electron/package.json').version"
+          ls -lah node_modules/electron/
+          ls -lah node_modules/electron/dist/ || true
+          find node_modules/electron -maxdepth 3 -name Electron.app -o -name electron
+
       - name: Build macOS application
         run: npx electron-builder --mac --arm64
 

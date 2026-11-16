@@ -2,7 +2,7 @@ appId: it.easytv.app
 productName: EasyTV
 executableName: easytv
 
-electronDist: node_modules/electron/dist
+#electronDist: node_modules/electron/dist
 
 directories:
   output: dist
