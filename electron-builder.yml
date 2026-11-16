@@ -3,7 +3,7 @@ productName: EasyTV
 executableName: easytv
 
 electronDownload:
-  mirror: https://github.com/castlabs/electron-releases/releases/download/v
+  mirror: https://github.com/castlabs/electron-releases/releases/download
 
 directories:
   output: dist
