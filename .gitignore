@@ -3,5 +3,5 @@ dist/
 .electron-cache/
 .tmp/
 out/
-build/
+build/ 
 package-lock.json
