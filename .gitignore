@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.electron-cache/
+.tmp/
+out/
+build/
+package-lock.json

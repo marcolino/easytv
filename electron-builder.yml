@@ -1,0 +1,32 @@
+appId: it.easytv.app
+productName: EasyTV
+executableName: easytv
+
+electronDist: node_modules/electron/dist
+
+directories:
+  output: dist
+
+files:
+  - src/**/*
+  - assets/**/*
+
+linux:
+  target:
+    - deb
+  category: AudioVideo
+  icon: assets/logos
+  syncDesktopName: true
+  maintainer: EasyTV
+  synopsis: Desktop TV streaming launcher
+  description: Simple desktop application for streaming live TV channels.
+  desktop:
+    entry:
+      Name: EasyTV
+      Comment: Desktop TV Streaming
+      Categories: AudioVideo;Video;
+      StartupWMClass: easytv
+      Terminal: false
+
+deb:
+  compression: xz

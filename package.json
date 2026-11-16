@@ -1,0 +1,23 @@
+{
+  "name": "easytv",
+  "version": "1.0.0",
+  "description": "Simple desktop TV streaming launcher",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "TMPDIR=\"$PWD/.tmp\" electron_config_cache=\"$PWD/.electron-cache\" electron .",
+    "check": "node --check src/main.js && node --check src/preload.js && node --check src/channels.js",
+    "pack:linux": "electron-builder --linux --dir --x64",
+    "dist:linux": "electron-builder --linux --x64",
+    "dist:linux:deb": "electron-builder --linux deb --x64",
+    "vm": "virt-manager"
+  },
+  "private": true,
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "github:castlabs/electron-releases#v46.0.0-alpha.7+wvcus",
+    "electron-builder": "^26.18.1"
+  },
+  "author": "Marco Solari <marcosolari@gmail.com>",
+  "homepage": "https://github.com/marcolino/easytv",
+  "desktopName": "EasyTV"
+}
