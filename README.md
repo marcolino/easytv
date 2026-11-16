@@ -4,6 +4,12 @@ EasyTV is a simple desktop application for watching live TV channels from your c
 
 It provides a straightforward channel-selection window and opens the selected stream in a separate fullscreen window.
 
+## Screenshots
+
+*A picture is worth a thousand words!* :-)
+
+![EasyTV v1 screenshot](screenshots/easytv-v1.png)
+
 ## Features
 
 - Simple channel-selection interface.
