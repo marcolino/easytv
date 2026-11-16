@@ -2,7 +2,8 @@ appId: it.easytv.app
 productName: EasyTV
 executableName: easytv
 
-#electronDist: node_modules/electron/dist
+electronDownload:
+  mirror: https://github.com/castlabs/electron-releases/releases/download/v
 
 directories:
   output: dist
