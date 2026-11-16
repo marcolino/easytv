@@ -1,292 +1,241 @@
-# Building EasyTV
+# EasyTV — Build and Development Guide
 
-This document describes how to prepare the development environment, validate the source code, and build EasyTV for Linux and Windows.
+This document describes how to install dependencies, run EasyTV locally and build distributable packages.
 
-## 1. Requirements
+## Technology
 
-### Common requirements
-
-- Git
-- Node.js and npm
-- Internet connection
-- A clone of the EasyTV repository
-
-The project uses:
-
-- Electron (Castlabs build with Widevine support)
+- Electron
+- Node.js
+- JavaScript (CommonJS)
 - electron-builder
+- Castlabs Electron with Widevine support
 
-The Electron dependency is defined in `package.json`:
+### Important versions
 
-```json
-"electron": "github:castlabs/electron-releases#v46.0.0-alpha.7+wvcus"
-```
+| Component | Version |
+|---|---|
+| Electron | `46.0.0-alpha.7+wvcus` |
+| electron-builder | `26.18.1` |
+| Node.js | 22.x |
 
-Do not replace it with the standard Electron package: the Castlabs build is used for Widevine support.
+The project uses the Castlabs Electron distribution rather than the standard Electron release.
 
-### Linux build environment
+Do not replace it with standard Electron: Widevine support is required.
 
-A Linux distribution with a graphical desktop is recommended. The build has been tested on Ubuntu.
+## Requirements
 
-### Windows build environment
+- Node.js 22.x
+- npm
+- Git
+- Platform-specific build tools where required
 
-- Windows 10 or Windows 11, 64-bit
-- Node.js and npm
-- Git for Windows
-- Microsoft Visual C++ Redistributable 2015–2022 (x64)
-
-The Visual C++ Redistributable is required by the native components used by Electron.
-
-A Windows virtual machine can be used to build and test the Windows version from a Linux host.
-
-## 2. Get the source code
-
-Clone the repository:
+## Clone and install
 
 ```bash
 git clone https://github.com/marcolino/easytv.git
 cd easytv
-```
 
-Install dependencies:
-
-```bash
 npm install
 ```
 
-For subsequent installations, if the repository contains a synchronized `package-lock.json`, you can use:
+The Electron dependency is obtained from the Castlabs GitHub repository.
+
+If Git attempts to access the public repository through SSH and no SSH key is configured, use an HTTPS URL rewrite:
 
 ```bash
-npm ci
+git config --global \
+  url."https://github.com/".insteadOf \
+  "git@github.com:"
 ```
 
-## 3. Validate the source
+## Development
 
-Run the syntax checks:
+Check the JavaScript files:
 
 ```bash
 npm run check
 ```
 
-This checks the JavaScript files:
-
-- `src/main.js`
-- `src/preload.js`
-- `src/channels.js`
-
-## 4. Build for Linux
-
-The Linux build uses the configuration in `electron-builder.yml`.
-
-The current configuration generates a Debian package (`.deb`).
-
-### Build the Debian package
-
-```bash
-npm run dist:linux:deb
-```
-
-Alternatively:
-
-```bash
-npm run dist:linux
-```
-
-### Build an unpacked application directory
-
-Useful for testing before creating an installer:
-
-```bash
-npm run pack:linux
-```
-
-### Output
-
-Build artifacts are written to:
-
-```text
-dist/
-```
-
-The Debian package will have a name similar to:
-
-```text
-easytv_1.0.0_amd64.deb
-```
-
-Install the package locally for testing:
-
-```bash
-sudo apt install ./dist/easytv_1.0.0_amd64.deb
-```
-
-## 5. Build for Windows
-
-The Windows build is produced using electron-builder and the NSIS installer target.
-
-**Important:** Build the Windows version on Windows. A Windows VM running on a Linux host is suitable.
-
-### 5.1 Prepare the Windows environment
-
-Install:
-
-1. Node.js and npm.
-2. Git for Windows.
-3. Microsoft Visual C++ Redistributable 2015–2022 (x64).
-
-Restart Windows after installing the Visual C++ Redistributable if required.
-
-Open Command Prompt or Git Bash and clone the repository:
-
-```bash
-git clone https://github.com/marcolino/easytv.git
-cd easytv
-```
-
-### 5.2 Install dependencies
-
-From Windows Command Prompt:
-
-```cmd
-npm install
-```
-
-Check the installed Electron version:
-
-```cmd
-node -p "require('electron/package.json').version"
-```
-
-It should report:
-
-```text
-46.0.0-alpha.7+wvcus
-```
-
-Check that Electron can start:
-
-```cmd
-npx electron --version
-```
-
-### 5.3 Prepare the Windows application icon
-
-The Windows installer requires an `.ico` file.
-
-The source image is:
-
-```text
-assets/logos/easytv-512.png
-```
-
-Generate the ICO file from the project root:
-
-```cmd
-npx --yes png-to-ico assets/logos/easytv-512.png > assets/logos/easytv.ico
-```
-
-The resulting file should be:
-
-```text
-assets/logos/easytv.ico
-```
-
-### 5.4 Windows configuration
-
-The following Windows configuration must be present at the end of `electron-builder.yml`:
-
-```yaml
-win:
-  target:
-    - nsis
-  icon: assets/logos/easytv.ico
-
-nsis:
-  oneClick: false
-  perMachine: false
-  allowToChangeInstallationDirectory: true
-  createDesktopShortcut: true
-  createStartMenuShortcut: true
-```
-
-Keep the existing Linux configuration unchanged.
-
-### 5.5 Build the Windows installer
-
-From Windows Command Prompt:
-
-```cmd
-npx electron-builder --win nsis --x64
-```
-
-### Output
-
-The installer is generated in:
-
-```text
-dist/
-```
-
-Expected output:
-
-```text
-dist/
-├── EasyTV Setup 1.0.0.exe
-└── EasyTV Setup 1.0.0.exe.blockmap
-```
-
-The `.exe` file is the installer to distribute.
-
-### 5.6 Test the installed application
-
-1. Run `EasyTV Setup 1.0.0.exe`.
-2. Complete the installation.
-3. Launch EasyTV from the Start menu or desktop shortcut.
-4. Check that the channel-selection window opens.
-5. Test a normal live stream.
-6. Test a DRM-protected channel, such as Canale 5.
-7. Check that playback and audio work correctly.
-
-The first launch may need internet access to initialize or download Widevine components.
-
-## 6. Development and testing
-
-### Run on Linux
+Run the application:
 
 ```bash
 npm start
 ```
 
-### Run on Windows
-
-```cmd
-npx electron .
-```
-
-The Windows development command is used instead of the Linux-specific `npm start` script.
-
-### Run syntax checks
-
-On either platform:
+On Linux, if Electron's download/cache directories need to be kept inside the project, use:
 
 ```bash
-npm run check
+mkdir -p .tmp .electron-cache
+
+TMPDIR="$PWD/.tmp" \
+electron_config_cache="$PWD/.electron-cache" \
+npm start
 ```
 
-## 7. Build summary
+## Build configuration
 
-| Platform | Command | Result |
-|---|---|---|
-| Linux | `npm run pack:linux` | Unpacked application |
-| Linux | `npm run dist:linux:deb` | Debian installer |
-| Windows | `npx electron-builder --win nsis --x64` | Windows NSIS installer |
+Build configuration is maintained in:
 
-## 8. Important notes
+```text
+electron-builder.yml
+```
 
-- Use the Castlabs Electron distribution specified in `package.json`.
-- Keep the Linux build configuration intact when adding or changing Windows settings.
-- The Windows `.ico` file is required by the Windows packaging configuration.
-- Windows builds should be tested on Windows, including when using a virtual machine.
-- The Windows installer is currently unsigned. A code-signing certificate would be needed to sign it.
-- Do not distribute a build until both ordinary streaming and DRM-protected playback have been tested.
-- Build artifacts are stored in `dist/` and should not be committed to the source repository.
+The configuration contains platform-specific settings for Linux, Windows and macOS.
+
+The global `electronDist` setting must not point to a locally installed Linux Electron distribution: electron-builder needs to obtain the appropriate Castlabs distribution for the target platform.
+
+The Castlabs download mirror is configured as:
+
+```yaml
+electronDownload:
+  mirror: https://github.com/castlabs/electron-releases/releases/download/
+```
+
+The trailing slash is important.
+
+The resulting download URL must follow this pattern:
+
+```text
+https://github.com/castlabs/electron-releases/releases/download/v46.0.0-alpha.7+wvcus/electron-v46.0.0-alpha.7+wvcus-darwin-arm64.zip
+```
+
+## Linux build
+
+Build the Debian package on Linux:
+
+```bash
+npx electron-builder --linux deb --publish never
+```
+
+The output is placed in:
+
+```text
+dist/
+```
+
+## Windows build
+
+Build the Windows x64 installer on Windows:
+
+```bash
+npx electron-builder --win --x64 --publish never
+```
+
+The configured target is NSIS.
+
+The installer allows the user to choose the installation directory and creates Start Menu and desktop shortcuts.
+
+Output:
+
+```text
+dist/
+```
+
+## macOS build
+
+The macOS build currently targets Apple Silicon (ARM64).
+
+It is performed using a GitHub Actions macOS runner because the development environment does not include a Mac.
+
+Build command:
+
+```bash
+npx electron-builder --mac --arm64 --publish never
+```
+
+The configured macOS targets are:
+
+- DMG
+- ZIP
+
+The macOS icon is generated from the PNG source using macOS tools (`sips` and `iconutil`) during the CI workflow.
+
+### macOS signing
+
+The current experimental build is unsigned:
+
+- No Apple Developer ID certificate.
+- No notarization.
+- No hardened-runtime distribution configuration.
+
+This is suitable for initial testing, not for a public macOS release.
+
+A production release will require Apple Developer ID signing, the appropriate hardened-runtime configuration and notarization.
+
+## GitHub Actions
+
+The macOS build runs on a GitHub-hosted macOS runner.
+
+The workflow is manually triggered and produces an artifact named:
+
+```text
+easytv-macos-arm64
+```
+
+The artifact contains the generated macOS package files.
+
+To retrieve it:
+
+1. Open the GitHub repository.
+2. Go to **Actions**.
+3. Select the completed macOS build.
+4. Find the **Artifacts** section.
+5. Download `easytv-macos-arm64`.
+
+The current workflow verifies that packaging completes. It does not establish that the application works correctly on a physical Mac.
+
+## Widevine and DRM
+
+EasyTV uses the Castlabs Electron distribution:
+
+```text
+46.0.0-alpha.7+wvcus
+```
+
+Widevine components are initialized by the application at startup:
+
+```javascript
+await components.whenReady();
+```
+
+The presence of the Widevine-enabled Electron distribution and a successful package build do not, by themselves, prove DRM playback works.
+
+The following tests should be performed on each target operating system:
+
+- Application startup.
+- Ordinary channel playback.
+- Playback of DRM-protected channels.
+- Playback after advertising.
+- Audio.
+- Fullscreen behavior.
+- Closing the stream and returning to channel selection.
+
+Windows Canale 5 playback, including after advertising, has been tested successfully.
+
+macOS Widevine playback remains unverified and requires testing on a physical Apple Silicon Mac.
+
+## macOS testing checklist
+
+When a physical Mac becomes available, test:
+
+- [ ] Application opens successfully.
+- [ ] Main channel-selection window loads.
+- [ ] Channel selection works.
+- [ ] Streaming window opens in fullscreen.
+- [ ] Ordinary streams play.
+- [ ] Canale 5 plays after advertising.
+- [ ] Audio works.
+- [ ] `Esc` closes the streaming window.
+- [ ] System tray behavior works.
+- [ ] Application can be quit and restarted normally.
+
+## Release considerations
+
+Before publishing a production release:
+
+- Test the installers on their target operating systems.
+- Verify Widevine playback independently on each platform.
+- Sign Windows and macOS packages as appropriate.
+- Complete macOS notarization.
+- Verify that all required assets and icons are included.
+- Keep the Electron and Castlabs versions consistent across builds.

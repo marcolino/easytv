@@ -1,91 +1,73 @@
 # EasyTV
 
-EasyTV is a simple desktop application for watching Italian live TV channels.
+EasyTV is a simple desktop application for watching live TV channels from your computer.
 
-It provides a straightforward channel-selection window. Select a channel and EasyTV opens its live stream in a separate window.
+It provides a straightforward channel-selection window and opens the selected stream in a separate fullscreen window.
 
 ## Features
 
-- Simple channel selection interface.
-- Live streams from Italian TV channels.
-- Full-screen video playback.
+- Simple channel-selection interface.
+- Live TV streaming.
+- Fullscreen playback.
 - System tray integration.
-- Support for DRM-protected streams through Widevine.
+- Persistent browser session for streaming websites.
+- Widevine DRM support through Castlabs Electron.
 
-### Available channels
+## Supported platforms
 
-- Rai 1
-- Rai 2
-- Rai 3
-- Rai News 24
-- Canale 5
-- Rete 4
-- Italia 1
-- TGCOM24
-- La7
-- TV8
-- NOVE
+| Platform | Package | Status |
+|---|---|---|
+| Linux x64 | Debian `.deb` | Tested |
+| Windows x64 | NSIS `.exe` installer | Tested |
+| macOS ARM64 | `.dmg` / `.zip` | Experimental |
 
-Channel availability and streaming quality depend on the broadcasters' services and your internet connection.
+**macOS note:** The macOS application has been successfully packaged, but it has not yet been tested on a physical Mac. In particular, Widevine DRM playback is not yet verified on macOS.
 
 ## Installation
 
-Download the installer for your operating system from the project's Releases page:
-
-**[EasyTV releases](https://github.com/marcolino/easytv/releases)**
-
-### Windows
-
-1. Download `EasyTV Setup` for Windows.
-2. Run the installer.
-3. Follow the installation instructions.
-4. Launch EasyTV from the Start menu or desktop shortcut.
-
-Windows may display a security warning because the installer is not digitally signed. Only install software downloaded from the official project repository.
-
 ### Linux
 
-On Ubuntu or a compatible Debian-based distribution:
-
-1. Download the `.deb` package.
-2. Open it with your software installer.
-3. Install EasyTV.
-4. Launch it from your applications menu.
-
-Alternatively, install it from a terminal:
+Download the Debian package and install it:
 
 ```bash
 sudo apt install ./easytv_1.0.0_amd64.deb
 ```
 
-## Using EasyTV
+Launch EasyTV from your applications menu.
 
-1. Start EasyTV.
-2. Select the channel you want to watch.
-3. The live stream opens in its own window.
-4. Close the video window when you want to return to channel selection.
+### Windows
 
-EasyTV can remain running in the system tray, so you can reopen the main window without restarting the application.
+Download and run the EasyTV Windows installer (`.exe`).
 
-## Troubleshooting
+Follow the installation instructions and launch EasyTV from the Start menu or desktop shortcut.
 
-**The stream does not start**
+### macOS
 
-- Check your internet connection.
-- Try another channel.
-- Check whether the broadcaster's website is working.
+macOS builds are currently experimental and intended for testing.
 
-**A channel displays a black screen or an error**
+They are built for Apple Silicon (ARM64). The application is not yet signed or notarized, and compatibility with streaming services and DRM has not been verified on a physical Mac.
 
-Some broadcasters use DRM protection or change their streaming services. Playback may temporarily stop working when their services change.
+## Usage
 
-**The application starts but protected streams do not play**
+1. Launch EasyTV.
+2. Select a channel.
+3. The stream opens in a separate fullscreen window.
+4. Press `Esc` to close the streaming window and return to channel selection.
 
-Widevine components may need to be downloaded or initialized. Make sure EasyTV has internet access and try again.
+EasyTV can remain available in the system tray.
 
-## Project
+## Streaming and DRM
 
-- Source code: https://github.com/marcolino/easytv
-- Releases: https://github.com/marcolino/easytv/releases
+Streaming availability and playback quality depend on the broadcaster's website, network connection and regional restrictions.
 
-EasyTV is an independent desktop application. It does not host or provide the TV streams; streams are supplied by the respective broadcasters.
+Some channels use Widevine DRM. EasyTV uses a Castlabs Electron build with Widevine support.
+
+Successful playback may depend on the operating system, browser components and broadcaster changes.
+
+## Support and development
+
+For installation details, build instructions and development information, see [BUILD.md](BUILD.md).
+
+Project repository:
+
+https://github.com/marcolino/easytv
