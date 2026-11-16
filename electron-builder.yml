@@ -11,6 +11,7 @@ files:
   - src/**/*
   - assets/**/*
 
+# Linux configuration
 linux:
   target:
     - deb
@@ -30,3 +31,25 @@ linux:
 
 deb:
   compression: xz
+
+# Windows configuration
+win:
+  target:
+    - nsis
+  icon: assets/logos/easytv.ico
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+
+# MacOS configuration
+mac:
+  target:
+    - dmg
+    - zip
+  icon: assets/logos/easytv.icns
+  identity: null
+  hardenedRuntime: false
