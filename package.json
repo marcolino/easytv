@@ -4,7 +4,8 @@
   "description": "Simple desktop TV streaming launcher",
   "main": "src/main.js",
   "scripts": {
-    "start": "TMPDIR=\"$PWD/.tmp\" electron_config_cache=\"$PWD/.electron-cache\" electron .",
+    "start": "TMPDIR=\"$PWD/.tmp\" electron_config_cache=\"$PWD/.electron-cache\" electron --ozone-platform=x11 .",
+    "start:wayland": "TMPDIR=\"$PWD/.tmp\" electron_config_cache=\"$PWD/.electron-cache\" electron --ozone-platform=wayland .",
     "check": "node --check src/main.js && node --check src/preload.js && node --check src/channels.js",
     "pack:linux": "electron-builder --linux --dir --x64",
     "dist:linux": "electron-builder --linux --x64",
