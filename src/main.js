@@ -8,6 +8,7 @@ const appTitle = `EasyTV ${appVersion} · build ${buildInfo.build}`;
 let mainWindow = null;
 let streamWindow = null;
 let tray = null;
+let currentChannelId = null;
 const appIcon = path.join(__dirname, '../assets/logos/easytv.png');
 
 // Enable the system tray only when explicitly requested.
@@ -211,14 +212,128 @@ function hideCursor(window) {
   window.webContents.executeJavaScript(script).catch(console.error);
 }
 
+function changeChannel(direction) {
+  // Sort channels by their conventional TV numbers.
+  const orderedChannels = channels
+    .filter(channel => Number.isInteger(channel.number))
+    .sort((a, b) => a.number - b.number);
+
+  if (orderedChannels.length === 0) return;
+
+  // Determine which channel is currently playing.
+  const currentIndex = orderedChannels.findIndex(
+    channel => channel.id === currentChannelId
+  );
+
+  let nextIndex;
+
+  if (currentIndex === -1) {
+    // No channel currently selected.
+    nextIndex = direction > 0 ? 0 : orderedChannels.length - 1;
+  } else {
+    // Wrap around at the beginning/end of the list.
+    nextIndex = (
+      currentIndex + direction + orderedChannels.length
+    ) % orderedChannels.length;
+  }
+
+  openChannel(orderedChannels[nextIndex].id);
+}
+
+function handleRemoteInput(event, input, currentWindow = null) {
+  if (input.type !== 'keyDown') return false;
+
+  // Ignore modified keys and automatic key repeats.
+  if (input.control || input.alt || input.meta || input.isAutoRepeat) {
+    return false;
+  }
+
+  const key = input.key;
+
+  // Numeric channel selection: 1, 48, 51, etc.
+  if (/^[0-9]$/.test(key)) {
+    event.preventDefault();
+    handleChannelDigit(key);
+    return true;
+  }
+
+  // Confirm numeric entry immediately.
+  if ((key === 'Enter' || key === 'NumpadEnter') && channelDigits) {
+    event.preventDefault();
+    selectNumberedChannel();
+    return true;
+  }
+
+  // Correct numeric entry.
+  if (key === 'Backspace' && channelDigits) {
+    event.preventDefault();
+
+    channelDigits = channelDigits.slice(0, -1);
+
+    if (channelTimer) {
+      clearTimeout(channelTimer);
+      channelTimer = null;
+    }
+
+    if (channelDigits) {
+      channelTimer = setTimeout(selectNumberedChannel, 1500);
+    }
+
+    return true;
+  }
+
+  // Escape cancels pending digits.
+  // Otherwise the streaming window handles Escape normally.
+  if (key === 'Escape' && channelDigits) {
+    event.preventDefault();
+    cancelChannelNumber();
+    return true;
+  }
+
+  // HOME: close streaming and return to channel selection.
+  if (key === 'Home') {
+    event.preventDefault();
+    cancelChannelNumber();
+
+    if (streamWindow && !streamWindow.isDestroyed()) {
+      streamWindow.close();
+    } else if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.show();
+      mainWindow.focus();
+    }
+
+    return true;
+  }
+
+  // CH+: next channel in conventional numeric order.
+  if (key === 'PageUp') {
+    event.preventDefault();
+    cancelChannelNumber();
+    changeChannel(+1);
+    return true;
+  }
+
+  // CH-: previous channel in conventional numeric order.
+  if (key === 'PageDown') {
+    event.preventDefault();
+    cancelChannelNumber();
+    changeChannel(-1);
+    return true;
+  }
+
+  return false;
+}
+
 function openChannel(channelId) {
   const channel = channels.find(item => item.id === channelId);
   if (!channel) return;
 
-  if (streamWindow && !streamWindow.isDestroyed()) {
-    streamWindow.close();
-  }
+  const previousWindow =
+    streamWindow && !streamWindow.isDestroyed() ? streamWindow : null;
 
+  currentChannelId = channel.id;
+
+  // Register the replacement before closing the previous stream.
   streamWindow = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -235,10 +350,19 @@ function openChannel(channelId) {
 
   const currentWindow = streamWindow;
 
+  if (previousWindow) {
+    previousWindow.close();
+    // Ensure the new stream remains the active window.
+    currentWindow.focus();
+  }
+  currentWindow.easyTVChannelId = channel.id;
 
   currentWindow.webContents.setAudioMuted(false);
 
   currentWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown') return;
+    if (handleRemoteInput(event, input, currentWindow)) return;
+
     if (input.key === 'Escape') {
       event.preventDefault();
       currentWindow.close();
@@ -498,9 +622,11 @@ function openChannel(channelId) {
   });
 
   currentWindow.on('closed', () => {
-    if (streamWindow === currentWindow) {
-      streamWindow = null;
-    }
+    // Ignore the old window's close event when changing channels.
+    if (streamWindow !== currentWindow) return;
+
+    streamWindow = null;
+    currentChannelId = null;
 
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.show();
