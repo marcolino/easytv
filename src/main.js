@@ -1,5 +1,6 @@
 const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, components } = require('electron');
 const path = require('node:path');
+const { execFile } = require('node:child_process');
 const channels = require('./channels');
 
 let mainWindow = null;
@@ -14,7 +15,6 @@ app.commandLine.appendSwitch(
 
 function createMainWindow() {
   mainWindow = new BrowserWindow({
-    //fullscreen: true,
     width: 1000,
     height: 666,
     minWidth: 700,
@@ -24,6 +24,7 @@ function createMainWindow() {
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
+      partition: 'persist:easytv',
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true
@@ -40,26 +41,66 @@ function createMainWindow() {
 function hideCursor(window) {
   const script = `
     (() => {
+      if (window.__easyTVCursorInstalled) return;
+      window.__easyTVCursorInstalled = true;
+
       const style = document.createElement('style');
-      style.textContent = '* { cursor: none !important; }';
+      style.id = 'easytv-cursor-style';
+
       document.documentElement.appendChild(style);
 
-      let timer;
+      // Initially hidden; real activity shows the cursor for 2.5 seconds.
+      let lastActivity = Date.now() - 3000;
 
-      function showCursor() {
-        style.textContent = '* { cursor: auto !important; }';
-        clearTimeout(timer);
-        timer = setTimeout(() => {
-          style.textContent = '* { cursor: none !important; }';
-        }, 2500);
+      function updateCursor() {
+        const hidden = Date.now() - lastActivity >= 2500;
+
+        const css = hidden
+          ? 'html, body, *, *::before, *::after { cursor: none !important; }'
+          : 'html, body, *, *::before, *::after { cursor: auto !important; }';
+
+        // Reattach if the player replaced the document head.
+        if (!style.isConnected) {
+          document.documentElement.appendChild(style);
+        }
+
+        if (style.textContent !== css) {
+          style.textContent = css;
+        }
       }
 
-      document.addEventListener('mousemove', showCursor);
-      document.addEventListener('keydown', showCursor);
+      function onActivity(event) {
+        if (!event.isTrusted) return;
+
+        lastActivity = Date.now();
+        updateCursor();
+      }
+
+      document.addEventListener('mousemove', onActivity, true);
+      document.addEventListener('keydown', onActivity, true);
+      document.addEventListener('pointermove', onActivity, true);
+
+      updateCursor();
+
+      setInterval(updateCursor, 250);
     })();
   `;
 
-  window.webContents.executeJavaScript(script).catch(() => {});
+  window.webContents.executeJavaScript(script).catch(console.error);
+}
+
+function wakeCursorTimer() {
+  execFile(
+    'xdotool',
+    ['mousemove_relative', '--', '1', '0'],
+    (error) => {
+      if (error) {
+        console.warn('Cursor refresh failed:', error.message);
+      } else {
+        console.log('Cursor refresh triggered');
+      }
+    }
+  );
 }
 
 function openChannel(channelId) {
@@ -85,17 +126,36 @@ function openChannel(channelId) {
   });
 
   const currentWindow = streamWindow;
-  
+
+  // NOVE: refresh the native cursor after player initialization.
+  if (channel.id === 'nove') {
+    const timers = [];
+
+    function scheduleCursorRefresh(delay) {
+      const timer = setTimeout(() => {
+        if (!currentWindow.isDestroyed() &&
+            currentWindow.isFocused()) {
+          console.log('NOVE: refreshing native cursor');
+          wakeCursorTimer();
+        }
+      }, delay);
+
+      timers.push(timer);
+    }
+
+    // Initial player and advertisement transitions.
+    scheduleCursorRefresh(5000);
+    scheduleCursorRefresh(12000);
+    scheduleCursorRefresh(20000);
+
+    currentWindow.on('closed', () => {
+      timers.forEach(clearTimeout);
+    });
+  }
+
   currentWindow.webContents.setAudioMuted(false);
 
   currentWindow.webContents.on('before-input-event', (event, input) => {
-    /*
-    if (input.type !== 'keyDown') return;
-    console.log('KEY:', input.key, 'TYPE:', input.type);
-    */
-
-    console.log('KEY EVENT:', input.key, input.type, input.code);
-
     if (input.key === 'Escape') {
       event.preventDefault();
       currentWindow.close();
@@ -190,96 +250,165 @@ function openChannel(channelId) {
         `);
       }
 
+      // TV8: maintain fullscreen, including after advertisements.
       if (channel.id === 'tv8') {
         const activated = await currentWindow.webContents.executeJavaScript(`
-          new Promise(resolve => {
-            let attempts = 0;
+          (() => {
+            // Avoid installing multiple supervisors.
+            if (window.__easyTV8Supervisor) {
+              return 'fullscreen supervisor already installed';
+            }
 
-            const checkPlayer = () => {
+            let lastPlayer = null;
+            let lastAttempt = 0;
+            let restoring = false;
+
+            function getPlayer() {
               const id = window.SkyPlayer?.getAllSessions?.()[0];
-              const player = id && window.SkyPlayer[id];
+              return id ? window.SkyPlayer[id] : null;
+            }
 
-              if (player?.setFullscreen && player.getState() === 'playing') {
-                try {
-                  player.setFullscreen(true);
-                  resolve('fullscreen requested');
-                  return;
-                } catch (error) {
-                  console.error('TV8 fullscreen error:', error);
+            function restoreFullscreen(player) {
+              if (!player || restoring) return;
+
+              const now = Date.now();
+
+              // Avoid repeated fullscreen requests.
+              if (now - lastAttempt < 2000) return;
+
+              try {
+                if (player.getState?.() !== 'playing') return;
+
+                if (player.getFullscreen?.()) return;
+
+                lastAttempt = now;
+                restoring = true;
+
+                console.log('TV8: requesting fullscreen');
+
+                const result = player.setFullscreen(true);
+
+                Promise.resolve(result)
+                  .catch(error => {
+                    console.warn('TV8 fullscreen error:', error);
+                  })
+                  .finally(() => {
+                    restoring = false;
+                  });
+
+              } catch (error) {
+                restoring = false;
+                console.warn('TV8 fullscreen exception:', error);
+              }
+            }
+
+            function checkPlayer() {
+              const player = getPlayer();
+              if (!player) return;
+
+              if (player !== lastPlayer) {
+                console.log('TV8: player instance detected/changed');
+                lastPlayer = player;
+
+                // Register listener on each new player instance.
+                if (player.on && player.Events?.AD_BREAK_END) {
+                  player.on(player.Events.AD_BREAK_END, () => {
+                    console.log('TV8: advertisement break ended');
+
+                    setTimeout(() => {
+                      restoreFullscreen(getPlayer());
+                    }, 1000);
+                  });
                 }
               }
 
-              if (++attempts >= 120) {
-                resolve('player not ready');
-                return;
-              }
+              restoreFullscreen(player);
+            }
 
-              setTimeout(checkPlayer, 500);
+            // Monitor player changes and fullscreen state.
+            const timer = setInterval(checkPlayer, 1000);
+
+            window.__easyTV8Supervisor = {
+              timer,
+              checkPlayer
             };
 
             checkPlayer();
-          });
+
+            return 'TV8 fullscreen supervisor installed';
+          })();
         `);
 
-        console.log('TV8 fullscreen:', activated);
+        console.log('TV8:', activated);
       }
 
-      // NOVE: enable audio and fullscreen.
+      // NOVE: enable audio and maintain fullscreen.
       if (channel.id === 'nove') {
         const activated = await currentWindow.webContents.executeJavaScript(`
-          new Promise(resolve => {
-            let attempts = 0;
+          (() => {
+            if (window.__easyNoveSupervisor) {
+              return 'NOVE supervisor already installed';
+            }
 
-            const checkPlayer = () => {
+            let lastAttempt = 0;
+            let busy = false;
+
+            async function checkPlayer() {
               const video = document.querySelector('video');
-              const fullscreenButton = document.querySelector(
-                '.vjs-fullscreen-control'
-              );
 
-              if (video && fullscreenButton && !video.paused) {
-                video.muted = false;
-                video.volume = 1;
+              const player = video &&
+                window.videojs?.getPlayer?.(video.id);
 
-                const player = videojs?.getPlayer?.(video.id);
+              if (!video || !player) return;
 
-                if (player) {
-                  player.requestFullscreen();
-                  resolve('audio enabled, fullscreen requested');
-                  return;
-                }
+              // Enable audio.
+              if (video.muted) video.muted = false;
+              if (video.volume !== 1) video.volume = 1;
 
-                fullscreenButton.click();
-                resolve('audio enabled, fullscreen clicked');
-                return;
+              // Wait until actual playback.
+              if (video.paused || video.readyState < 2) return;
+
+              // Already fullscreen.
+              if (player.isFullscreen?.()) return;
+
+              if (busy || Date.now() - lastAttempt < 3000) return;
+
+              lastAttempt = Date.now();
+              busy = true;
+
+              try {
+                console.log('NOVE: requesting fullscreen');
+
+                await player.requestFullscreen();
+
+                await new Promise(resolve => setTimeout(resolve, 500));
+
+                console.log('NOVE fullscreen:', player.isFullscreen());
+              } catch (error) {
+                console.warn(
+                  'NOVE fullscreen failed:',
+                  error.message
+                );
+              } finally {
+                busy = false;
               }
+            }
 
-              if (++attempts >= 120) {
-                resolve('player not ready');
-                return;
-              }
+            const timer = setInterval(checkPlayer, 1000);
 
-              setTimeout(checkPlayer, 500);
+            window.__easyNoveSupervisor = {
+              timer,
+              checkPlayer
             };
 
             checkPlayer();
-          });
+
+            return 'NOVE supervisor installed';
+          })();
         `);
 
         console.log('NOVE:', activated);
       }
-      // NOVE: unmute the HTML video element.
-      // if (channel.id === 'nove') {
-      //   await new Promise(resolve => setTimeout(resolve, 1500));
-
-      //   await currentWindow.webContents.executeJavaScript(`
-      //     const video = document.querySelector('video');
-
-      //     if (video) {
-      //       video.muted = false;
-      //       video.volume = 1;
-      //     }
-      //   `);
-      // }
     } catch (error) {
       console.error('EasyTV autoplay/fullscreen error:', error);
     }
@@ -348,14 +477,8 @@ ipcMain.handle('open-channel', (event, channelId) => {
 });
 
 app.whenReady().then(async () => {
-  // console.log('Initializing Widevine components...');
-  // console.log('APP NAME:', app.getName());
-  // console.log('APP PATH:', app.getAppPath());
-  // console.log('WINDOW ID:', mainWindow?.getNativeWindowHandle());
-
   try {
     await components.whenReady();
-    // console.log('Widevine components ready:', components.status());
   } catch (error) {
     console.error('Widevine components error:', error, '-', 'status:', components.status());
   }
