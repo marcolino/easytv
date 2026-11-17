@@ -8,7 +8,7 @@ It provides a fullscreen channel-selection window and opens the selected stream 
 
 *A picture is worth a thousand words!* :-)
 
-![EasyTV v1 screenshot](screenshots/easytv-v1.png)
+![EasyTV v1 screenshot](screenshots/easytv-v2.png)
 
 ## Features
 
