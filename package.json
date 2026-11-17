@@ -6,10 +6,20 @@
   "scripts": {
     "start": "TMPDIR=\"$PWD/.tmp\" electron_config_cache=\"$PWD/.electron-cache\" electron --ozone-platform=x11 .",
     "start:wayland": "TMPDIR=\"$PWD/.tmp\" electron_config_cache=\"$PWD/.electron-cache\" electron --ozone-platform=wayland .",
-    "check": "node --check src/main.js && node --check src/preload.js && node --check src/channels.js",
+
+    "check": "node --check src/main.js && node --check src/preload.js && node --check src/channels.js && node --check src/renderer/app.js && node --check scripts/increment-build.js",
+
+    "build:all": "npm run check && npm run build:win && npm run build:linux",
+
+    "prebuild:win": "node scripts/increment-build.js",
+    "build:win": "electron-builder --win nsis --x64",
+
+    "prebuild:linux": "node scripts/increment-build.js",
+    "build:linux": "electron-builder --linux deb --x64",
+
+    "prepack:linux": "node scripts/increment-build.js",
     "pack:linux": "electron-builder --linux --dir --x64",
-    "dist:linux": "electron-builder --linux --x64",
-    "dist:linux:deb": "electron-builder --linux deb --x64",
+
     "vm": "virt-manager"
   },
   "private": true,

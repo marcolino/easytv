@@ -1,17 +1,116 @@
-const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, components } = require('electron');
+const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, components, session } = require('electron');
 const path = require('node:path');
-const { execFile } = require('node:child_process');
 const channels = require('./channels');
+const buildInfo = require('./build-info.json');
+const appVersion = require('../package.json').version;
+const appTitle = `EasyTV ${appVersion} · build ${buildInfo.build}`;
 
 let mainWindow = null;
 let streamWindow = null;
 let tray = null;
 const appIcon = path.join(__dirname, '../assets/logos/easytv.png');
 
+// Enable the system tray only when explicitly requested.
+const trayEnabled = process.env.EASYTV_TRAY === '1';
+
 app.commandLine.appendSwitch(
   'autoplay-policy',
   'no-user-gesture-required'
 );
+
+// Conventional TV channel selection: 1, 12, 48, 51, etc.
+let channelDigits = '';
+let channelTimer = null;
+
+function handleChannelDigit(digit) {
+  channelDigits += digit;
+
+  if (channelTimer) {
+    clearTimeout(channelTimer);
+  }
+
+  // Maximum three digits.
+  if (channelDigits.length >= 3) {
+    selectNumberedChannel();
+    return;
+  }
+
+  channelTimer = setTimeout(selectNumberedChannel, 1500);
+}
+
+function selectNumberedChannel() {
+  if (channelTimer) {
+    clearTimeout(channelTimer);
+    channelTimer = null;
+  }
+
+  if (!channelDigits) return;
+
+  const number = Number(channelDigits);
+  channelDigits = '';
+
+  const channel = channels.find(item => item.number === number);
+
+  if (!channel) {
+    console.log(`EasyTV: channel ${number} not available`);
+    return;
+  }
+
+  openChannel(channel.id);
+}
+
+function cancelChannelNumber() {
+  if (channelTimer) {
+    clearTimeout(channelTimer);
+    channelTimer = null;
+  }
+
+  channelDigits = '';
+}
+
+function handleChannelKeyboard(event, input, isStreaming = false) {
+  if (input.type !== 'keyDown') return false;
+
+  // Ignore modifier combinations and auto-repeat.
+  if (input.control || input.alt || input.meta || input.isAutoRepeat) {
+    return false;
+  }
+
+  const key = input.key;
+
+  if (/^[0-9]$/.test(key)) {
+    event.preventDefault();
+    handleChannelDigit(key);
+    return true;
+  }
+
+  if (key === 'Enter' && channelDigits) {
+    event.preventDefault();
+    selectNumberedChannel();
+    return true;
+  }
+
+  if (key === 'Backspace' && channelDigits) {
+    event.preventDefault();
+    channelDigits = channelDigits.slice(0, -1);
+
+    if (channelTimer) clearTimeout(channelTimer);
+
+    channelTimer = channelDigits
+      ? setTimeout(selectNumberedChannel, 1500)
+      : null;
+
+    return true;
+  }
+
+  if (key === 'Escape' && channelDigits) {
+    event.preventDefault();
+    cancelChannelNumber();
+    return true;
+  }
+
+  return false;
+}
 
 function createMainWindow() {
   mainWindow = new BrowserWindow({
@@ -19,7 +118,8 @@ function createMainWindow() {
     height: 666,
     minWidth: 700,
     minHeight: 500,
-    title: 'EasyTV',
+    title: appTitle,
+    fullscreen: true,
     icon: appIcon,
     autoHideMenuBar: true,
     webPreferences: {
@@ -30,6 +130,28 @@ function createMainWindow() {
       sandbox: true
     }
   });
+
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown') return;
+
+    if (handleChannelKeyboard(event, input)) return;
+
+    if (input.key === 'F11') {
+      event.preventDefault();
+      mainWindow.setFullScreen(!mainWindow.isFullScreen());
+    } else if (input.key === 'Escape' && mainWindow.isFullScreen()) {
+      event.preventDefault();
+      mainWindow.setFullScreen(false);
+    }
+  });
+
+  const notifyFullscreen = () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('main-fullscreen-changed', mainWindow.isFullScreen());
+    }
+  };
+  mainWindow.on('enter-full-screen', notifyFullscreen);
+  mainWindow.on('leave-full-screen', notifyFullscreen);
 
   mainWindow.loadFile(path.join(__dirname, 'renderer/index.html'));
 
@@ -89,20 +211,6 @@ function hideCursor(window) {
   window.webContents.executeJavaScript(script).catch(console.error);
 }
 
-function wakeCursorTimer() {
-  execFile(
-    'xdotool',
-    ['mousemove_relative', '--', '1', '0'],
-    (error) => {
-      if (error) {
-        console.warn('Cursor refresh failed:', error.message);
-      } else {
-        console.log('Cursor refresh triggered');
-      }
-    }
-  );
-}
-
 function openChannel(channelId) {
   const channel = channels.find(item => item.id === channelId);
   if (!channel) return;
@@ -127,31 +235,6 @@ function openChannel(channelId) {
 
   const currentWindow = streamWindow;
 
-  // NOVE: refresh the native cursor after player initialization.
-  if (channel.id === 'nove') {
-    const timers = [];
-
-    function scheduleCursorRefresh(delay) {
-      const timer = setTimeout(() => {
-        if (!currentWindow.isDestroyed() &&
-            currentWindow.isFocused()) {
-          console.log('NOVE: refreshing native cursor');
-          wakeCursorTimer();
-        }
-      }, delay);
-
-      timers.push(timer);
-    }
-
-    // Initial player and advertisement transitions.
-    scheduleCursorRefresh(5000);
-    scheduleCursorRefresh(12000);
-    scheduleCursorRefresh(20000);
-
-    currentWindow.on('closed', () => {
-      timers.forEach(clearTimeout);
-    });
-  }
 
   currentWindow.webContents.setAudioMuted(false);
 
@@ -471,6 +554,11 @@ function createTray() {
 }
 
 ipcMain.handle('get-channels', () => channels);
+ipcMain.handle('get-app-info', () => ({
+  version: appVersion,
+  build: buildInfo.build,
+  fullscreen: mainWindow?.isFullScreen() ?? false
+}));
 
 ipcMain.handle('open-channel', (event, channelId) => {
   openChannel(channelId);
@@ -483,8 +571,21 @@ app.whenReady().then(async () => {
     console.error('Widevine components error:', error, '-', 'status:', components.status());
   }
 
+  // Block unwanted screen-sharing requests.
+  const ses = session.fromPartition('persist:easytv');
+  ses.setDisplayMediaRequestHandler((request, callback) => {
+    console.warn(
+      'EasyTV: screen-sharing request blocked:',
+      request.securityOrigin
+    );
+
+    callback({});
+  });
+
   createMainWindow();
-  createTray();
+  if (trayEnabled) {
+    createTray();
+  }
 
   app.on('activate', () => {
     if (!mainWindow) createMainWindow();
@@ -492,7 +593,10 @@ app.whenReady().then(async () => {
 });
 
 app.on('window-all-closed', () => {
-  // Keep EasyTV running in the system tray.
+  // Keep EasyTV running in the system tray, if enabled.
+  if (!trayEnabled) {
+    app.quit();
+  }
 });
 
 app.on('before-quit', () => {
