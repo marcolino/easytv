@@ -1,0 +1,896 @@
+const {
+  app, BrowserWindow, ipcMain, Tray, Menu,
+  nativeImage, components, session, globalShortcut
+} = require('electron');
+const path = require('node:path');
+const channels = require('./channels');
+const buildInfo = require('./build-info.json');
+const appVersion = require('../package.json').version;
+const appTitle = `EasyTV ${appVersion} · build ${buildInfo.build}`;
+
+let mainWindow = null;
+let streamWindow = null;
+let tray = null;
+let currentChannelId = null;
+const appIcon = path.join(__dirname, '../assets/logos/easytv.png');
+
+// Enable the system tray only when explicitly requested.
+const trayEnabled = process.env.EASYTV_TRAY === '1';
+
+app.commandLine.appendSwitch(
+  'autoplay-policy',
+  'no-user-gesture-required'
+);
+
+// Conventional TV channel selection: 1, 12, 48, 51, etc.
+let channelDigits = '';
+let channelTimer = null;
+
+function handleChannelDigit(digit) {
+  channelDigits += digit;
+
+  if (channelTimer) {
+    clearTimeout(channelTimer);
+  }
+
+  // Maximum three digits.
+  if (channelDigits.length >= 3) {
+    selectNumberedChannel();
+    return;
+  }
+
+  channelTimer = setTimeout(selectNumberedChannel, 1500);
+}
+
+function selectNumberedChannel() {
+  if (channelTimer) {
+    clearTimeout(channelTimer);
+    channelTimer = null;
+  }
+
+  if (!channelDigits) return;
+
+  const number = Number(channelDigits);
+  channelDigits = '';
+
+  const channel = channels.find(item => item.number === number);
+
+  if (!channel) {
+    console.log(`EasyTV: channel ${number} not available`);
+    return;
+  }
+
+  openChannel(channel.id);
+}
+
+function cancelChannelNumber() {
+  if (channelTimer) {
+    clearTimeout(channelTimer);
+    channelTimer = null;
+  }
+
+  channelDigits = '';
+}
+
+function handleChannelKeyboard(event, input, isStreaming = false) {
+  if (input.type !== 'keyDown') return false;
+
+  // Ignore modifier combinations and auto-repeat.
+  if (input.control || input.alt || input.meta || input.isAutoRepeat) {
+    return false;
+  }
+
+  const key = input.key;
+
+  if (/^[0-9]$/.test(key)) {
+    event.preventDefault();
+    handleChannelDigit(key);
+    return true;
+  }
+
+  if (key === 'Enter' && channelDigits) {
+    event.preventDefault();
+    selectNumberedChannel();
+    return true;
+  }
+
+  if (key === 'Backspace' && channelDigits) {
+    event.preventDefault();
+    channelDigits = channelDigits.slice(0, -1);
+
+    if (channelTimer) clearTimeout(channelTimer);
+
+    channelTimer = channelDigits
+      ? setTimeout(selectNumberedChannel, 1500)
+      : null;
+
+    return true;
+  }
+
+  if (key === 'Escape' && channelDigits) {
+    event.preventDefault();
+    cancelChannelNumber();
+    return true;
+  }
+
+  return false;
+}
+
+function createMainWindow() {
+  mainWindow = new BrowserWindow({
+    width: 1000,
+    height: 666,
+    minWidth: 700,
+    minHeight: 500,
+    title: appTitle,
+    fullscreen: true,
+    icon: appIcon,
+    autoHideMenuBar: true,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      partition: 'persist:easytv',
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true
+    }
+  });
+
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown') return;
+
+    if (handleChannelKeyboard(event, input)) return;
+
+    if (input.key === 'F11') {
+      event.preventDefault();
+      mainWindow.setFullScreen(!mainWindow.isFullScreen());
+    } else if (input.key === 'Escape' && mainWindow.isFullScreen()) {
+      event.preventDefault();
+      mainWindow.setFullScreen(false);
+    }
+  });
+
+  const notifyFullscreen = () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('main-fullscreen-changed', mainWindow.isFullScreen());
+    }
+  };
+  mainWindow.on('enter-full-screen', notifyFullscreen);
+  mainWindow.on('leave-full-screen', notifyFullscreen);
+
+  mainWindow.loadFile(path.join(__dirname, 'renderer/index.html'));
+
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+  });
+}
+
+function hideCursor(window) {
+  const script = `
+    (() => {
+      if (window.__easyTVCursorInstalled) return;
+      window.__easyTVCursorInstalled = true;
+
+      const style = document.createElement('style');
+      style.id = 'easytv-cursor-style';
+
+      document.documentElement.appendChild(style);
+
+      // Initially hidden; real activity shows the cursor for 2.5 seconds.
+      let lastActivity = Date.now() - 3000;
+
+      function updateCursor() {
+        const hidden = Date.now() - lastActivity >= 2500;
+
+        const css = hidden
+          ? 'html, body, *, *::before, *::after { cursor: none !important; }'
+          : 'html, body, *, *::before, *::after { cursor: auto !important; }';
+
+        // Reattach if the player replaced the document head.
+        if (!style.isConnected) {
+          document.documentElement.appendChild(style);
+        }
+
+        if (style.textContent !== css) {
+          style.textContent = css;
+        }
+      }
+
+      function onActivity(event) {
+        if (!event.isTrusted) return;
+
+        lastActivity = Date.now();
+        updateCursor();
+      }
+
+      document.addEventListener('mousemove', onActivity, true);
+      document.addEventListener('keydown', onActivity, true);
+      document.addEventListener('pointermove', onActivity, true);
+
+      updateCursor();
+
+      setInterval(updateCursor, 250);
+    })();
+  `;
+
+  window.webContents.executeJavaScript(script).catch(console.error);
+}
+
+function recoverMediasetAudio(window) {
+  const script = `
+    (() => {
+      if (window.__easyTVAudioRecoveryInstalled) return;
+      window.__easyTVAudioRecoveryInstalled = true;
+
+      const recoveryTimers = new WeakMap();
+
+      function recover(video) {
+        if (video.paused || video.ended) return;
+
+        if (video.muted || video.volume === 0) {
+          video.muted = false;
+          video.volume = 1;
+
+          console.log('EasyTV: Mediaset audio recovered');
+        }
+      }
+
+      function scheduleRecovery(video) {
+        if (recoveryTimers.has(video)) return;
+
+        const timer = setTimeout(() => {
+          recoveryTimers.delete(video);
+          recover(video);
+        }, 1500);
+
+        recoveryTimers.set(video, timer);
+      }
+
+      setInterval(() => {
+        for (const video of document.querySelectorAll('video')) {
+          if (!video.paused && !video.ended) {
+            scheduleRecovery(video);
+          }
+        }
+      }, 500);
+    })();
+  `;
+
+  window.webContents.executeJavaScript(script).catch(console.error);
+}
+
+function changeChannel(direction) {
+  // Sort channels by their conventional TV numbers.
+  const orderedChannels = channels
+    .filter(channel => Number.isInteger(channel.number))
+    .sort((a, b) => a.number - b.number);
+
+  if (orderedChannels.length === 0) return;
+
+  // Determine which channel is currently playing.
+  const currentIndex = orderedChannels.findIndex(
+    channel => channel.id === currentChannelId
+  );
+
+  let nextIndex;
+
+  if (currentIndex === -1) {
+    // No channel currently selected.
+    nextIndex = direction > 0 ? 0 : orderedChannels.length - 1;
+  } else {
+    // Wrap around at the beginning/end of the list.
+    nextIndex = (
+      currentIndex + direction + orderedChannels.length
+    ) % orderedChannels.length;
+  }
+
+  openChannel(orderedChannels[nextIndex].id);
+}
+
+function handleRemoteInput(event, input, currentWindow = null) {
+  if (input.type !== 'keyDown') return false;
+
+  // Ignore modified keys and automatic key repeats.
+  if (input.control || input.alt || input.meta || input.isAutoRepeat) {
+    return false;
+  }
+
+  const key = input.key;
+
+  // Numeric channel selection: 1, 48, 51, etc.
+  if (/^[0-9]$/.test(key)) {
+    event.preventDefault();
+    handleChannelDigit(key);
+    return true;
+  }
+
+  // Confirm numeric entry immediately.
+  if ((key === 'Enter' || key === 'NumpadEnter') && channelDigits) {
+    event.preventDefault();
+    selectNumberedChannel();
+    return true;
+  }
+
+  // Correct numeric entry.
+  if (key === 'Backspace' && channelDigits) {
+    event.preventDefault();
+
+    channelDigits = channelDigits.slice(0, -1);
+
+    if (channelTimer) {
+      clearTimeout(channelTimer);
+      channelTimer = null;
+    }
+
+    if (channelDigits) {
+      channelTimer = setTimeout(selectNumberedChannel, 1500);
+    }
+
+    return true;
+  }
+
+  // Escape cancels pending digits.
+  // Otherwise the streaming window handles Escape normally.
+  if (key === 'Escape' && channelDigits) {
+    event.preventDefault();
+    cancelChannelNumber();
+    return true;
+  }
+
+  // HOME: close streaming and return to channel selection.
+  if (key === 'Home') {
+    event.preventDefault();
+    cancelChannelNumber();
+
+    if (streamWindow && !streamWindow.isDestroyed()) {
+      streamWindow.close();
+    } else if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.show();
+      mainWindow.focus();
+    }
+
+    return true;
+  }
+
+  // CH+: next channel in conventional numeric order.
+  if (key === 'PageUp') {
+    event.preventDefault();
+    cancelChannelNumber();
+    changeChannel(+1);
+    return true;
+  }
+
+  // CH-: previous channel in conventional numeric order.
+  if (key === 'PageDown') {
+    event.preventDefault();
+    cancelChannelNumber();
+    changeChannel(-1);
+    return true;
+  }
+
+  return false;
+}
+
+let escapeShortcutOwner = null;
+
+function disableStreamEscapeShortcut(window) {
+  if (escapeShortcutOwner !== window) return;
+
+  globalShortcut.unregister('Escape');
+  escapeShortcutOwner = null;
+}
+
+function enableStreamEscapeShortcut(window) {
+  if (window.isDestroyed()) return;
+  if (escapeShortcutOwner === window) return;
+
+  // Remove the shortcut associated with the previous stream.
+  if (escapeShortcutOwner) {
+    disableStreamEscapeShortcut(escapeShortcutOwner);
+  }
+
+  const registered = globalShortcut.register('Escape', () => {
+    // Never act on another application's window.
+    if (window.isDestroyed()) return;
+    if (BrowserWindow.getFocusedWindow() !== window) return;
+
+    // Preserve the existing numeric-entry cancellation behavior.
+    if (channelDigits) {
+      cancelChannelNumber();
+      return;
+    }
+
+    console.log('EasyTV: Escape closes streaming');
+
+    window.close();
+  });
+
+  if (registered) {
+    escapeShortcutOwner = window;
+  } else {
+    console.warn('EasyTV: could not register Escape shortcut');
+  }
+}
+
+function installMediasetFullscreen(window) {
+  const script = `
+    (() => {
+      if (window.__easyTVMediasetFullscreen) return;
+      window.__easyTVMediasetFullscreen = true;
+
+      const style = document.createElement('style');
+      style.id = 'easytv-mediaset-fullscreen';
+
+      style.textContent = \`
+        html, body {
+          margin: 0 !important;
+          width: 100% !important;
+          height: 100% !important;
+          overflow: hidden !important;
+          background: black !important;
+        }
+
+        .persistent-video-player {
+          position: fixed !important;
+          inset: 0 !important;
+          width: 100vw !important;
+          height: 100vh !important;
+          z-index: 2147483647 !important;
+          background: black !important;
+        }
+
+        .persistent-video-player video {
+          width: 100% !important;
+          height: 100% !important;
+          object-fit: contain !important;
+        }
+      \`;
+
+      document.documentElement.appendChild(style);
+    })();
+  `;
+
+  window.webContents.executeJavaScript(script).catch(console.error);
+}
+
+function openChannel(channelId) {
+  const channel = channels.find(item => item.id === channelId);
+  if (!channel) return;
+
+  const previousWindow =
+    streamWindow && !streamWindow.isDestroyed() ? streamWindow : null;
+
+  currentChannelId = channel.id;
+
+  // Register the replacement before closing the previous stream.
+  streamWindow = new BrowserWindow({
+    width: 1280,
+    height: 800,
+    title: `EasyTV - ${channel.name}`,
+    autoHideMenuBar: true,
+    fullscreen: true,
+    webPreferences: {
+      partition: 'persist:easytv',
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true
+    }
+  });
+
+  const currentWindow = streamWindow;
+
+  // Enable the Escape shortcut only while streaming has focus.
+  currentWindow.on('focus', () => {
+    enableStreamEscapeShortcut(currentWindow);
+  });
+
+  currentWindow.on('blur', () => {
+    disableStreamEscapeShortcut(currentWindow);
+  });
+
+  if (previousWindow) {
+    previousWindow.close();
+    // Ensure the new stream remains the active window.
+    currentWindow.focus();
+  }
+  currentWindow.easyTVChannelId = channel.id;
+
+  currentWindow.webContents.setAudioMuted(false);
+
+  currentWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown') return;
+
+    // Handle remote-control commands first.
+    if (handleRemoteInput(event, input, currentWindow)) return;
+
+    // ESC must close the streaming window, even when the
+    // broadcaster's video player is internally fullscreen.
+    if (input.key === 'Escape') {
+      event.preventDefault();
+
+      // Ignore repeated ESC events while closing.
+      if (!currentWindow.isDestroyed()) {
+        currentWindow.close();
+      }
+
+      return;
+    }
+
+    // Developer tools.
+    if (
+      input.key === 'F12' ||
+      (input.control && input.shift &&
+       input.key.toLowerCase() === 'i')
+    ) {
+      event.preventDefault();
+      currentWindow.webContents.toggleDevTools();
+    }
+  });
+
+  currentWindow.webContents.on('dom-ready', async () => {
+    if (currentWindow.isDestroyed()) return;
+
+    currentWindow.webContents.setAudioMuted(false);
+    hideCursor(currentWindow);
+
+    if (channel.group === 'MEDIASET') {
+      installMediasetFullscreen(currentWindow);
+      recoverMediasetAudio(currentWindow);
+    }
+    // Diagnostic: temporarily disable EasyTV audio recovery.
+    // if (channel.group === 'MEDIASET') {
+    //   recoverMediasetAudio(currentWindow);
+    // }
+
+    try {
+      // RaiPlay: start playback.
+      if (channel.group === 'RAI') {
+        await currentWindow.webContents.executeJavaScript(`
+          document.querySelector('.play-over-video')?.click();
+        `);
+      }
+
+      // Mediaset: activate player fullscreen once, without
+      // repeatedly clicking the fullscreen control.
+      if (channel.group === 'MEDIASET') {
+        const activated = await currentWindow.webContents.executeJavaScript(`
+          new Promise(resolve => {
+            let attempts = 0;
+            let activated = false;
+
+            const checkPlayer = () => {
+              if (activated) return;
+
+              // Fullscreen already active.
+              if (document.fullscreenElement) {
+                activated = true;
+                resolve('already fullscreen');
+                return;
+              }
+
+              const video = [...document.querySelectorAll('video')]
+                .find(v => !v.paused && v.readyState >= 2);
+
+              const buttons = document.querySelectorAll(
+                '.persistent-video-player footer button'
+              );
+
+              const button = buttons[buttons.length - 1];
+
+              if (video && button) {
+                const rect = button.getBoundingClientRect();
+
+                if (rect.width > 0 && rect.height > 0) {
+                  // Never click more than once.
+                  activated = true;
+                  button.click();
+                  resolve('fullscreen button clicked once');
+                  return;
+                }
+              }
+
+              if (++attempts >= 120) {
+                resolve('player or fullscreen button not ready');
+                return;
+              }
+
+              setTimeout(checkPlayer, 500);
+            };
+
+            checkPlayer();
+          });
+        `);
+
+        console.log('Mediaset fullscreen:', activated);
+      }
+
+      // LA7: click the fake overlay to start playback.
+      if (channel.id === 'la7') {
+        await new Promise(resolve => setTimeout(resolve, 1500));
+
+        await currentWindow.webContents.executeJavaScript(`
+          document.querySelector(
+            '#player_tgla7_fake .fake.container-icon'
+          )?.click();
+        `);
+      }
+
+      // TV8: maintain fullscreen, including after advertisements.
+      if (channel.id === 'tv8') {
+        const activated = await currentWindow.webContents.executeJavaScript(`
+          (() => {
+            // Avoid installing multiple supervisors.
+            if (window.__easyTV8Supervisor) {
+              return 'fullscreen supervisor already installed';
+            }
+
+            let lastPlayer = null;
+            let lastAttempt = 0;
+            let restoring = false;
+
+            function getPlayer() {
+              const id = window.SkyPlayer?.getAllSessions?.()[0];
+              return id ? window.SkyPlayer[id] : null;
+            }
+
+            function restoreFullscreen(player) {
+              if (!player || restoring) return;
+
+              const now = Date.now();
+
+              // Avoid repeated fullscreen requests.
+              if (now - lastAttempt < 2000) return;
+
+              try {
+                if (player.getState?.() !== 'playing') return;
+
+                if (player.getFullscreen?.()) return;
+
+                lastAttempt = now;
+                restoring = true;
+
+                console.log('TV8: requesting fullscreen');
+
+                const result = player.setFullscreen(true);
+
+                Promise.resolve(result)
+                  .catch(error => {
+                    console.warn('TV8 fullscreen error:', error);
+                  })
+                  .finally(() => {
+                    restoring = false;
+                  });
+
+              } catch (error) {
+                restoring = false;
+                console.warn('TV8 fullscreen exception:', error);
+              }
+            }
+
+            function checkPlayer() {
+              const player = getPlayer();
+              if (!player) return;
+
+              if (player !== lastPlayer) {
+                console.log('TV8: player instance detected/changed');
+                lastPlayer = player;
+
+                // Register listener on each new player instance.
+                if (player.on && player.Events?.AD_BREAK_END) {
+                  player.on(player.Events.AD_BREAK_END, () => {
+                    console.log('TV8: advertisement break ended');
+
+                    setTimeout(() => {
+                      restoreFullscreen(getPlayer());
+                    }, 1000);
+                  });
+                }
+              }
+
+              restoreFullscreen(player);
+            }
+
+            // Monitor player changes and fullscreen state.
+            const timer = setInterval(checkPlayer, 1000);
+
+            window.__easyTV8Supervisor = {
+              timer,
+              checkPlayer
+            };
+
+            checkPlayer();
+
+            return 'TV8 fullscreen supervisor installed';
+          })();
+        `);
+
+        console.log('TV8:', activated);
+      }
+
+      // NOVE: enable audio and maintain fullscreen.
+      if (channel.id === 'nove') {
+        const activated = await currentWindow.webContents.executeJavaScript(`
+          (() => {
+            if (window.__easyNoveSupervisor) {
+              return 'NOVE supervisor already installed';
+            }
+
+            let lastAttempt = 0;
+            let busy = false;
+
+            async function checkPlayer() {
+              const video = document.querySelector('video');
+
+              const player = video &&
+                window.videojs?.getPlayer?.(video.id);
+
+              if (!video || !player) return;
+
+              // Enable audio.
+              if (video.muted) video.muted = false;
+              if (video.volume !== 1) video.volume = 1;
+
+              // Wait until actual playback.
+              if (video.paused || video.readyState < 2) return;
+
+              // Already fullscreen.
+              if (player.isFullscreen?.()) return;
+
+              if (busy || Date.now() - lastAttempt < 3000) return;
+
+              lastAttempt = Date.now();
+              busy = true;
+
+              try {
+                console.log('NOVE: requesting fullscreen');
+
+                await player.requestFullscreen();
+
+                await new Promise(resolve => setTimeout(resolve, 500));
+
+                console.log('NOVE fullscreen:', player.isFullscreen());
+              } catch (error) {
+                console.warn(
+                  'NOVE fullscreen failed:',
+                  error.message
+                );
+              } finally {
+                busy = false;
+              }
+            }
+
+            const timer = setInterval(checkPlayer, 1000);
+
+            window.__easyNoveSupervisor = {
+              timer,
+              checkPlayer
+            };
+
+            checkPlayer();
+
+            return 'NOVE supervisor installed';
+          })();
+        `);
+
+        console.log('NOVE:', activated);
+      }
+    } catch (error) {
+      console.error('EasyTV autoplay/fullscreen error:', error);
+    }
+  });
+
+  currentWindow.on('closed', () => {
+    disableStreamEscapeShortcut(currentWindow);
+
+    // Ignore the old window's close event when changing channels.
+    if (streamWindow !== currentWindow) return;
+
+    streamWindow = null;
+    currentChannelId = null;
+
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+
+  // Handle the case where the window already has focus.
+  if (currentWindow.isFocused()) {
+    enableStreamEscapeShortcut(currentWindow);
+  }
+
+  currentWindow.loadURL(channel.url);
+}
+
+function createTray() {
+  const icon = nativeImage.createFromPath(appIcon);
+  tray = new Tray(icon);
+  tray.setToolTip('EasyTV');
+
+  tray.setContextMenu(Menu.buildFromTemplate([
+    {
+      label: 'Apri EasyTV',
+      click: () => {
+        if (mainWindow) {
+          mainWindow.show();
+          mainWindow.focus();
+        } else {
+          createMainWindow();
+        }
+      }
+    },
+    {
+      label: 'Chiudi streaming',
+      click: () => {
+        if (streamWindow && !streamWindow.isDestroyed()) {
+          streamWindow.close();
+        }
+      }
+    },
+    { type: 'separator' },
+    {
+      label: 'Esci',
+      click: () => app.quit()
+    }
+  ]));
+
+  tray.on('click', () => {
+    if (mainWindow) {
+      mainWindow.show();
+      mainWindow.focus();
+    } else {
+      createMainWindow();
+    }
+  });
+}
+
+ipcMain.handle('get-channels', () => channels);
+ipcMain.handle('get-app-info', () => ({
+  version: appVersion,
+  build: buildInfo.build,
+  fullscreen: mainWindow?.isFullScreen() ?? false
+}));
+
+ipcMain.handle('open-channel', (event, channelId) => {
+  openChannel(channelId);
+});
+
+app.whenReady().then(async () => {
+  try {
+    await components.whenReady();
+  } catch (error) {
+    console.error('Widevine components error:', error, '-', 'status:', components.status());
+  }
+
+  // Block unwanted screen-sharing requests.
+  const ses = session.fromPartition('persist:easytv');
+  ses.setDisplayMediaRequestHandler((request, callback) => {
+    console.warn(
+      'EasyTV: screen-sharing request blocked:',
+      request.securityOrigin
+    );
+
+    callback({});
+  });
+
+  createMainWindow();
+  if (trayEnabled) {
+    createTray();
+  }
+
+  app.on('activate', () => {
+    if (!mainWindow) createMainWindow();
+  });
+});
+
+app.on('window-all-closed', () => {
+  // Keep EasyTV running in the system tray, if enabled.
+  if (!trayEnabled) {
+    app.quit();
+  }
+});
+
+app.on('before-quit', () => {
+  if (streamWindow && !streamWindow.isDestroyed()) {
+    streamWindow.destroy();
+  }
+});

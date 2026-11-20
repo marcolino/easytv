@@ -13,7 +13,7 @@ It provides a fullscreen channel-selection window and opens the selected stream 
 ## Features
 
 - Channel-selection interface with broadcaster logos and right-aligned channel numbers.
-- Conventional Italian TV channel numbering, including Rai News 24 (48) and TGCOM24 (51).
+- Conventional Italian TV channel numbering, including Rai News 24 (48).
 - Mouse selection and keyboard-based channel selection.
 - TV-style numeric entry with a 1.5-second timeout and Enter/OK confirmation.
 - Next/previous channel navigation and return-to-channel-list shortcuts.
@@ -72,7 +72,7 @@ The channel-selection buttons remain clickable and keyboard-accessible. Their lo
 | 2 | Rai 2 | 8 | TV8 |
 | 3 | Rai 3 | 9 | NOVE |
 | 4 | Rete 4 | 48 | Rai News 24 |
-| 5 | Canale 5 | 51 | TGCOM24 |
+| 5 | Canale 5 | | |
 | 6 | Italia 1 | | |
 
 Numbers are defined explicitly in `src/channels.js`; they are independent of the order of the buttons on screen.
@@ -90,7 +90,7 @@ Numbers are defined explicitly in `src/channels.js`; they are independent of the
 | `PageDown` | CH− | Previous available channel in numeric order |
 | `F11` (main window) | — | Toggle main-window fullscreen |
 
-Numeric entry waits **1.5 seconds** after the last digit unless confirmed with `Enter`. For example, `4`, `8` selects Rai News 24; `5`, `1` selects TGCOM24. CH+/CH− wrap around at the ends of the channel list.
+Numeric entry waits **1.5 seconds** after the last digit unless confirmed with `Enter`. For example, `4`, `8` selects Rai News 24. CH+/CH− wrap around at the ends of the channel list.
 
 **Infrared hardware:** EasyTV currently handles keyboard events, not raw infrared signals. A programmable USB IR receiver (such as a keyboard-emulating receiver) can be configured to send the keys above. Other receivers may require Linux `rc-core`/LIRC configuration or additional mapping. The receiver must deliver input to an EasyTV window; system-wide remote control is not implemented. Physical IR-device testing is pending.
 

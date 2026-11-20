@@ -204,7 +204,6 @@ EasyTV uses a common keyboard-command path in Electron's main process for numeri
 |---|---|
 | `1`, wait 1.5 seconds | Open Rai 1 |
 | `4`, `8`, wait 1.5 seconds | Open Rai News 24 |
-| `5`, `1`, `Enter` | Open TGCOM24 immediately |
 | `PageUp` | Next channel in numeric order, wrapping around |
 | `PageDown` | Previous channel in numeric order, wrapping around |
 | `Home` while streaming | Close stream and return to channel list |

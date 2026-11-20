@@ -28,9 +28,9 @@ module.exports = [
     logo: 'italia1-it.png', group: 'MEDIASET',
     url: 'https://mediasetinfinity.mediaset.it/diretta/italia-1_cI1' },
 
-  { id: 'tgcom24', number: 51, name: 'TGCOM24',
-    logo: 'tgcom24-it.png', group: 'MEDIASET',
-    url: 'https://www.tgcom24.mediaset.it/diretta/canale-51-diretta-streaming_88728925-02l.shtml/' },
+  // { id: 'tgcom24', number: 51, name: 'TGCOM24',
+  //   logo: 'tgcom24-it.png', group: 'MEDIASET',
+  //   url: 'https://www.tgcom24.mediaset.it/diretta/canale-51-diretta-streaming_88728925-02l.shtml/' },
 
   { id: 'la7', number: 7, name: 'La7',
     logo: 'la7-it.png', group: 'ALTRI',

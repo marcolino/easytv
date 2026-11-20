@@ -9,7 +9,7 @@
 
     "check": "node --check src/main.js && node --check src/preload.js && node --check src/channels.js && node --check src/renderer/app.js && node --check scripts/increment-build.js",
 
-    "build": "npm run check && npm run build:win && npm run build:linux",
+    "build": "npm run check && npm run build:win && npm run build:linux && echo \"\\n\\nAll builds complete!\"",
 
     "prebuild:win": "node scripts/increment-build.js",
     "build:win": "electron-builder --win nsis --x64",
