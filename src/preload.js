@@ -1,9 +1,16 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('easyTV', {
+  getI18n: () => ipcRenderer.invoke('get-i18n'),
+  previewLanguage: language => ipcRenderer.send('preview-language', language),
   getChannels: () => ipcRenderer.invoke('get-channels'),
-  openChannel: channelId => ipcRenderer.invoke('open-channel', channelId),
   getAppInfo: () => ipcRenderer.invoke('get-app-info'),
+  getPreferences: () => ipcRenderer.invoke('get-preferences'),
+  savePreferences: data => ipcRenderer.invoke('save-preferences', data),
+  openChannel: id => ipcRenderer.invoke('open-channel', id),
+  requestPowerOff: () => ipcRenderer.invoke('request-power-off'),
+  setSettingsScreenOpen: open => ipcRenderer.send('settings-screen-state', open),
+  onSettingsShortcut: callback => ipcRenderer.on('settings-shortcut', () => callback()),
   onMainFullscreenChanged: callback => {
     const listener = (_event, fullscreen) => callback(fullscreen);
     ipcRenderer.on('main-fullscreen-changed', listener);

@@ -1,10 +1,14 @@
 const {
   app, BrowserWindow, ipcMain, Tray, Menu,
-  nativeImage, components, session, globalShortcut
+  nativeImage, components, session, globalShortcut, dialog
 } = require('electron');
 
 const path = require('node:path');
-const channels = require('./channels');
+const { execFile } = require('node:child_process');
+const channels = require('./tvs.json');
+const radios = require('./radios.json');
+const { dictionaries, languages, resolveLanguage, translate } = require('./i18n');
+const { createPreferences } = require('./preferences');
 const buildInfo = require('./build-info.json');
 const appVersion = require('../package.json').version;
 
@@ -13,6 +17,12 @@ const appIcon = path.join(__dirname, '../assets/logos/easytv.png');
 
 // The system tray is disabled unless explicitly enabled.
 const trayEnabled = process.env.EASYTV_TRAY === '1';
+const tvsetEnabled = process.env.TVSET === '1';
+const preferences = createPreferences(app, channels, radios);
+let settingsScreenOpen = false;
+let previewLanguage = null;
+function systemLanguages() { return app.getPreferredSystemLanguages(); }
+function t(key, values) { return translate(resolveLanguage(previewLanguage || preferences.get().language, systemLanguages()), key, values); }
 
 let mainWindow = null;
 let streamWindow = null;
@@ -106,6 +116,7 @@ function changeChannel(direction) {
 
 function handleRemoteInput(event, input) {
   if (input.type !== 'keyDown') return false;
+  if (settingsScreenOpen && BrowserWindow.getFocusedWindow() === mainWindow) return false;
 
   if (input.control || input.alt || input.meta || input.isAutoRepeat) {
     return false;
@@ -190,7 +201,29 @@ function handleRemoteInput(event, input) {
 // Main channel-selection window
 // ------------------------------------------------------------
 
+function handleAppShortcut(event, input, streaming = false) {
+  if (!['F2', 'F10'].includes(input.key)) return false;
+  if (input.control || input.alt || input.meta || input.shift) return false;
+  event.preventDefault();
+  if (input.type !== 'keyDown' || input.isAutoRepeat) return true;
+  cancelChannelNumber();
+  if (input.key === 'F10') {
+    requestPowerOff().then(result => {
+      if (result?.action === 'unsupported') dialog.showErrorBox('EasyTV', result.message);
+    }).catch(error => console.error('EasyTV power:', error));
+  } else {
+    if (streaming && streamWindow && !streamWindow.isDestroyed()) streamWindow.close();
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.show();
+      mainWindow.focus();
+      mainWindow.webContents.send('settings-shortcut');
+    }
+  }
+  return true;
+}
+
 function createMainWindow() {
+  settingsScreenOpen = false;
   mainWindow = new BrowserWindow({
     width: 1000,
     height: 666,
@@ -210,6 +243,7 @@ function createMainWindow() {
   });
 
   mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (handleAppShortcut(event, input)) return;
     if (input.type !== 'keyDown') return;
 
     if (handleRemoteInput(event, input)) return;
@@ -217,7 +251,7 @@ function createMainWindow() {
     if (input.key === 'F11') {
       event.preventDefault();
       mainWindow.setFullScreen(!mainWindow.isFullScreen());
-    } else if (input.key === 'Escape' && mainWindow.isFullScreen()) {
+    } else if (input.key === 'Escape' && !settingsScreenOpen && mainWindow.isFullScreen()) {
       event.preventDefault();
       mainWindow.setFullScreen(false);
     }
@@ -235,7 +269,14 @@ function createMainWindow() {
   mainWindow.on('enter-full-screen', notifyFullscreen);
   mainWindow.on('leave-full-screen', notifyFullscreen);
 
-  mainWindow.loadFile(path.join(__dirname, 'renderer/index.html'));
+  const startupWindow = mainWindow;
+  startupWindow.loadFile(path.join(__dirname, 'renderer/index.html'));
+  const saved = preferences.get().lastStation;
+  if (saved?.type === 'tv' && channels.some(c => c.id === saved.id)) {
+    startupWindow.webContents.once('did-finish-load', () => {
+      if (!startupWindow.isDestroyed() && !streamWindow) openChannel(saved.id);
+    });
+  }
 
   mainWindow.on('closed', () => {
     mainWindow = null;
@@ -435,6 +476,8 @@ function enableStreamEscapeShortcut(window) {
 function openChannel(channelId) {
   const channel = channels.find(item => item.id === channelId);
   if (!channel) return;
+  try { preferences.remember('tv', channel.id); }
+  catch (error) { console.error('EasyTV: unable to remember channel:', error); }
 
   const previousWindow =
     streamWindow && !streamWindow.isDestroyed()
@@ -476,6 +519,7 @@ function openChannel(channelId) {
   currentWindow.webContents.setAudioMuted(false);
 
   currentWindow.webContents.on('before-input-event', (event, input) => {
+    if (handleAppShortcut(event, input, true)) return;
     if (input.type !== 'keyDown') return;
 
     if (handleRemoteInput(event, input)) return;
@@ -727,9 +771,14 @@ function createTray() {
   tray = new Tray(icon);
   tray.setToolTip('EasyTV');
 
+  updateTrayMenu();
+  tray.on('click', showMainFromTray);
+}
+function updateTrayMenu() {
+  if (!tray) return;
   tray.setContextMenu(Menu.buildFromTemplate([
     {
-      label: 'Apri EasyTV',
+      label: t('Open EasyTV'),
       click: () => {
         if (mainWindow) {
           mainWindow.show();
@@ -740,7 +789,7 @@ function createTray() {
       }
     },
     {
-      label: 'Chiudi streaming',
+      label: t('Close stream'),
       click: () => {
         if (streamWindow && !streamWindow.isDestroyed()) {
           streamWindow.close();
@@ -749,19 +798,47 @@ function createTray() {
     },
     { type: 'separator' },
     {
-      label: 'Esci',
+      label: t('Exit'),
       click: () => app.quit()
     }
   ]));
 
-  tray.on('click', () => {
+ }
+function showMainFromTray() {
     if (mainWindow) {
       mainWindow.show();
       mainWindow.focus();
     } else {
       createMainWindow();
     }
+}
+
+// ------------------------------------------------------------
+// Settings and deliberate power-off
+// ------------------------------------------------------------
+
+async function requestPowerOff() {
+  if (!tvsetEnabled) {
+    app.quit();
+    return { action: 'quit' };
+  }
+  if (process.platform !== 'linux') {
+    return { action: 'unsupported', message: t('TVSET shutdown is supported on Linux only.') };
+  }
+  const answer = dialog.showMessageBoxSync(BrowserWindow.getFocusedWindow() || mainWindow, {
+    type: 'warning', title: t('Shut down the device?'),
+    message: t('Do you want to shut down the device?'),
+    detail: t('EasyTV will close and the computer will shut down.'),
+    buttons: [t('Cancel'), t('Shut down')], defaultId: 0, cancelId: 0, noLink: true
   });
+  if (answer !== 1) return { action: 'cancelled' };
+  execFile('systemctl', ['poweroff'], { timeout: 10000 }, error => {
+    if (error) {
+      console.error('EasyTV: shutdown failed:', error);
+      dialog.showErrorBox('EasyTV', t('Shutdown failed: {message}', { message: error.message }));
+    }
+  });
+  return { action: 'shutdown-requested' };
 }
 
 // ------------------------------------------------------------
@@ -773,8 +850,26 @@ ipcMain.handle('get-channels', () => channels);
 ipcMain.handle('get-app-info', () => ({
   version: appVersion,
   build: buildInfo.build,
-  fullscreen: mainWindow?.isFullScreen() ?? false
+  fullscreen: mainWindow?.isFullScreen() ?? false,
+  tvset: tvsetEnabled
 }));
+
+ipcMain.handle('get-i18n', () => ({ dictionaries, languages, systemLanguage: resolveLanguage('auto', systemLanguages()) }));
+ipcMain.on('preview-language', (event, language) => {
+  if (mainWindow && event.sender === mainWindow.webContents) {
+    previewLanguage = ['auto', ...Object.keys(languages)].includes(language) ? language : null;
+    updateTrayMenu();
+  }
+});
+ipcMain.handle('get-preferences', () => preferences.get());
+ipcMain.handle('save-preferences', (_event, data) => preferences.update(data));
+ipcMain.handle('request-power-off', () => requestPowerOff());
+ipcMain.on('settings-screen-state', (event, isOpen) => {
+  if (mainWindow && !mainWindow.isDestroyed() && event.sender === mainWindow.webContents) {
+    settingsScreenOpen = isOpen === true;
+    if (!settingsScreenOpen) { previewLanguage = null; updateTrayMenu(); }
+  }
+});
 
 ipcMain.handle('open-channel', (event, channelId) => {
   openChannel(channelId);

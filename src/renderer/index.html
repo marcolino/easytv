@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -9,13 +9,33 @@
 <body>
   <div id="app-shell">
     <header>
-      <div>
-        <h1>EasyTV <span id="app-version"></span></h1>
-        <p>Scegli il canale da guardare</p>
+      <div><h1>EasyTV <span id="app-version"></span></h1><p id="subtitle" data-i18n="Choose a channel to watch">Choose a channel to watch</p></div>
+      <div class="header-actions">
+        <span class="status" data-i18n="TV streaming">TV streaming</span>
+        <button id="settings-button" class="header-button" type="button" aria-label="Settings" title="Settings">⚙</button>
+        <button id="power-button" class="header-button power-button" type="button" aria-label="Exit" title="Exit">⏻</button>
       </div>
-      <span class="status">TV STREAMING</span>
     </header>
     <main id="channels"></main>
+    <main id="settings-page" hidden>
+      <div class="settings-toolbar"><h2 data-i18n="Settings">Settings</h2><div class="toolbar-buttons"><button id="back-button" type="button" data-i18n="Cancel">Cancel</button><button id="save-settings" type="button" data-i18n="Save">Save</button></div></div>
+      <div class="language-row"><label for="language-select" data-i18n="Language">Language</label><select id="language-select"></select></div>
+      <p class="settings-description" data-i18n="Select your TV and radio favorites. Groups can be hidden without losing stations.">Select your TV and radio favorites. Groups can be hidden without losing stations.</p>
+      <h3 data-i18n="Television — catalogue and favorites">Television — catalogue and favorites</h3>
+      <div id="tv-catalogue" class="catalogue"></div>
+      <h3 data-i18n="Radio — catalogue and favorites">Radio — catalogue and favorites</h3>
+      <p class="settings-description" data-i18n="Radio catalogue and playback will be available in Phase 2.">Radio catalogue and playback will be available in Phase 2.</p>
+      <div id="radio-catalogue" class="catalogue"></div>
+      <details id="groups-panel"><summary data-i18n="Groups">Groups</summary>
+      <div id="groups-editor"></div>
+      <div class="settings-actions">
+        <button id="add-tv-group" type="button" data-i18n="Add TV group">Add TV group</button>
+        <button id="add-radio-group" type="button" data-i18n="Add radio group">Add radio group</button>
+
+      </div>
+      </details>
+      <p id="settings-message" role="status" aria-live="polite"></p>
+    </main>
   </div>
   <script src="app.js"></script>
 </body>

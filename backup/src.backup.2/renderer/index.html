@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EasyTV</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app-shell">
+    <header>
+      <div><h1>EasyTV <span id="app-version"></span></h1><p id="subtitle">Scegli il canale da guardare</p></div>
+      <div class="header-actions">
+        <span class="status">TV STREAMING</span>
+        <button id="settings-button" class="header-button" type="button" aria-label="Impostazioni" title="Impostazioni">⚙</button>
+        <button id="power-button" class="header-button power-button" type="button" aria-label="Esci" title="Esci">⏻</button>
+      </div>
+    </header>
+    <main id="channels"></main>
+    <main id="settings-page" hidden>
+      <div class="settings-toolbar"><h2>IMPOSTAZIONI</h2><button id="back-button" type="button">← Torna alla TV</button></div>
+      <p class="settings-description">★ Seleziona fino a 10 preferiti TV e 10 radio. I gruppi possono essere nascosti senza perdere le stazioni.</p>
+      <h3>TELEVISIONE — CATALOGO E PREFERITI</h3>
+      <div id="tv-catalogue" class="catalogue"></div>
+      <h3>RADIO — CATALOGO E PREFERITI</h3>
+      <p class="settings-description">Il catalogo e la riproduzione radio saranno disponibili nella fase 2.</p>
+      <div id="radio-catalogue" class="catalogue"></div>
+      <h3>GRUPPI</h3>
+      <div id="groups-editor"></div>
+      <div class="settings-actions">
+        <button id="add-tv-group" type="button">+ Gruppo TV</button>
+        <button id="add-radio-group" type="button">+ Gruppo radio</button>
+        <button id="save-settings" type="button">Salva modifiche</button>
+      </div>
+      <p id="settings-message" role="status" aria-live="polite"></p>
+    </main>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>
