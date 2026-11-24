@@ -39,7 +39,7 @@ function applyLanguage() {
   }
   languageSelect.value = preference;
   window.easyTV.previewLanguage(editing ? preference : null);
-  if (editing) { renderCatalogue('tv', tvs); renderCatalogue('radio', radios); renderGroups(); }
+  if (editing) { renderCatalogue('tv', tvs); renderCatalogue('radio', radios); renderGroups(); renderRadioResults(); }
   renderHome();
   scheduleFit();
 }
@@ -90,22 +90,109 @@ function channelButton(channel) {
   return b;
 }
 
+function radioLogo(station, className) {
+  const holder = element('span', className + ' radio-logo-holder');
+  const fallback = element('span', 'radio-logo-fallback', '♫');
+  holder.append(fallback);
+  if (station.logo) {
+    const img = element('img');
+    img.alt = ''; img.draggable = false;
+    img.addEventListener('load', () => { fallback.hidden = true; img.hidden = false; scheduleFit(); });
+    img.addEventListener('error', () => { img.remove(); fallback.hidden = false; scheduleFit(); });
+    img.hidden = true;
+    holder.append(img);
+    img.src = /^https?:\/\//i.test(station.logo) ? station.logo : `../../assets/icons/${station.logo}`;
+  }
+  return holder;
+}
+function radioButton(station) {
+  const b = button(station.name, () => window.easyTV.openRadio(station.id), 'channel');
+  b.prepend(radioLogo(station, 'channel-logo'));
+  return b;
+}
+let radioOffset = 0, radioQuery = {}, radioResults = [], radioMore = false;
+let searchGeneration = 0, radioStatus = null;
+function renderRadioResults() {
+  const holder = document.getElementById('radio-results');
+  holder.replaceChildren();
+  document.getElementById('radio-more').hidden = !radioMore;
+  document.getElementById('radio-status').textContent = radioStatus ? t(radioStatus.key, radioStatus.values) : '';
+  if (!editing) return;
+  for (const station of radioResults) {
+    const row = element('div', 'catalogue-item');
+    const selected = draft.favorites.radio.includes(station.id);
+    const add = button('', async () => {
+      if (!editing || saving) return;
+      const session = draft;
+      add.disabled = true;
+      try {
+        if (selected) draft.favorites.radio = draft.favorites.radio.filter(id => id !== station.id);
+        else {
+          const r = await window.easyTV.addRadio(station.id);
+          if (!radios.some(x => x.id === r.id)) radios.push(r);
+          if (!editing || saving || draft !== session) return;
+          if (!draft.favorites.radio.includes(r.id)) draft.favorites.radio.push(r.id);
+          let g = draft.groups.find(x => x.type === 'radio' && x.visible);
+          if (!g) { g = {id:'radio-'+Date.now(),name:t('Radio'),type:'radio',visible:true,stationIds:[]}; draft.groups.push(g); }
+          if (!draft.groups.some(x => x.type === 'radio' && x.visible && x.stationIds.includes(r.id))) g.stationIds.push(r.id);
+        }
+        renderCatalogue('radio', radios); renderGroups(); renderRadioResults();
+      } catch(e) { radioStatus = {key:'Error: {message}',values:{message:e.message}}; renderRadioResults(); }
+      finally { add.disabled = false; }
+    }, 'radio-add');
+    add.classList.toggle('radio-remove', selected);
+    add.append(element('span','yellow-star','★'), document.createTextNode(' ' + (selected ? t('Remove from favorites') : t('Add to favorites'))));
+    add.setAttribute('aria-pressed', String(selected));
+    const preview = button('🔊 ' + t('Preview'), async () => {
+      if (!editing || saving) return;
+      const session = draft;
+      try { const r = await window.easyTV.addRadio(station.id); if (!radios.some(x=>x.id===r.id)) radios.push(r);
+        if (!editing || saving || draft !== session) return;
+        renderCatalogue('radio',radios); renderGroups(); await window.easyTV.openRadio(r.id,true);
+      } catch(e) { radioStatus = {key:'Error: {message}',values:{message:e.message}}; renderRadioResults(); }
+    }, 'radio-preview');
+    row.append(radioLogo(station,'result-logo'), element('span','result-name',station.name + (station.genre ? ' · '+station.genre.slice(0,80) : '')), add, preview);
+    holder.append(row);
+  }
+  scheduleFit();
+}
+function clearRadioSearch() {
+  ++searchGeneration; radioOffset = 0; radioQuery = {}; radioResults = []; radioMore = false; radioStatus = null;
+  document.getElementById('radio-name').value = '';
+  document.getElementById('radio-country').value = 'IT';
+  document.getElementById('radio-genre').value = '';
+  document.getElementById('radio-search').disabled = document.getElementById('radio-more').disabled = false;
+  renderRadioResults(); document.getElementById('radio-name').focus();
+}
+async function searchRadio(next=false) {
+  const generation = ++searchGeneration;
+  const search = document.getElementById('radio-search'), more = document.getElementById('radio-more');
+  search.disabled = more.disabled = true;
+  if (!next) { radioOffset=0; radioQuery={name:document.getElementById('radio-name').value,country:document.getElementById('radio-country').value,genre:document.getElementById('radio-genre').value}; }
+  try {
+    const result = await window.easyTV.searchRadios({...radioQuery,offset:radioOffset});
+    if (!editing || generation !== searchGeneration) return;
+    radioResults = result.stations; radioOffset += 30; radioMore = result.more;
+    radioStatus = radioResults.length ? null : {key:'No stations found.'};
+    renderRadioResults();
+  } catch(e) { if (generation === searchGeneration && editing) { radioStatus = {key:'Error: {message}',values:{message:e.message}}; renderRadioResults(); } }
+  finally { if (generation === searchGeneration) search.disabled = more.disabled = false; }
+}
 function renderHome() {
   home.replaceChildren();
   for (const group of saved.groups) {
     if (!group.visible) continue;
     const catalogue = group.type === 'tv' ? tvs : radios;
     const favorites = new Set(saved.favorites[group.type]);
-    const stations = group.stationIds
-      .filter(id => favorites.has(id))
+    const stations = [...favorites]
+      .filter(id => group.stationIds.includes(id))
       .map(id => catalogue.find(s => s.id === id)).filter(Boolean);
-    // Radio playback will be introduced in Phase 2; no inert radio buttons on Home.
-    if (group.type === 'radio' || !stations.length) continue;
+    if (!stations.length) continue;
     const section = element('section', 'group');
     const heading = element('h2', '', group.name);
     const grid = element('div', 'channels');
     for (const station of stations) {
-      grid.append(channelButton(station));
+      grid.append(group.type === 'radio' ? radioButton(station) : channelButton(station));
     }
     section.append(heading, grid);
     home.append(section);
@@ -119,7 +206,15 @@ function renderCatalogue(type, catalogue) {
   const holder = document.getElementById(`${type}-catalogue`);
   holder.replaceChildren();
   const selected = draft.favorites[type];
-  for (const station of catalogue) {
+  const ordered = [...selected.map(id => catalogue.find(s => s.id === id)).filter(Boolean), ...catalogue.filter(s => !selected.includes(s.id))];
+  function reorder(id, target) {
+    const from = selected.indexOf(id);
+    if (from < 0 || target < 0 || target >= selected.length || from === target) return;
+    selected.splice(from, 1); selected.splice(target, 0, id);
+    renderCatalogue(type, catalogue); updateToolbar();
+    [...holder.querySelectorAll('.drag-handle')].find(el => el.dataset.stationId === id)?.focus();
+  }
+  for (const station of ordered) {
     const item = element('div', 'catalogue-item');
     const star = button(selected.includes(station.id) ? '★' : '☆', () => {
       const index = selected.indexOf(station.id);
@@ -131,12 +226,56 @@ function renderCatalogue(type, catalogue) {
       star.classList.toggle('favorite', selected.includes(station.id));
       star.setAttribute('aria-pressed', String(selected.includes(station.id)));
       message.textContent = '';
-      updateToolbar();
+      renderCatalogue(type, catalogue); renderRadioResults(); updateToolbar();
+      [...holder.querySelectorAll('.star-button')].find(el => el.dataset.stationId === station.id)?.focus();
     }, 'star-button');
+    star.dataset.stationId = station.id;
     star.classList.toggle('favorite', selected.includes(station.id));
     star.setAttribute('aria-pressed', String(selected.includes(station.id)));
     star.setAttribute('aria-label', t('Favorite: {name}', {name: station.name}));
-    item.append(star, element('span', '', `${station.number ?? ''} ${station.name}`.trim()));
+    if (selected.includes(station.id)) {
+      const handle = button('☰', () => {}, 'drag-handle');
+      handle.dataset.stationId = station.id;
+      handle.title = t('Reorder favorites (Alt+Up/Down)'); handle.setAttribute('aria-label', handle.title + ': ' + station.name);
+      handle.draggable = true;
+      const mime = 'application/x-easytv-' + type;
+      const clearMarks = () => holder.querySelectorAll('.drop-before, .drop-after').forEach(el => el.classList.remove('drop-before', 'drop-after'));
+      const after = e => { const r = item.getBoundingClientRect(); return e.clientX >= r.left + r.width / 2; };
+      handle.addEventListener('dragstart', e => {
+        e.dataTransfer.setData(mime, station.id);
+        e.dataTransfer.effectAllowed = 'move';
+        item.classList.add('dragging');
+      });
+      handle.addEventListener('dragend', () => { clearMarks(); item.classList.remove('dragging'); });
+      item.addEventListener('dragover', e => {
+        if (!e.dataTransfer.types.includes(mime)) return;
+        e.preventDefault(); e.dataTransfer.dropEffect = 'move';
+        clearMarks();
+        if (!item.classList.contains('dragging')) item.classList.add(after(e) ? 'drop-after' : 'drop-before');
+      });
+      item.addEventListener('dragleave', e => {
+        if (!item.contains(e.relatedTarget)) item.classList.remove('drop-before', 'drop-after');
+      });
+      item.addEventListener('drop', e => {
+        if (!e.dataTransfer.types.includes(mime)) return;
+        e.preventDefault();
+        const id = e.dataTransfer.getData(mime);
+        const from = selected.indexOf(id);
+        let target = selected.indexOf(station.id) + (after(e) ? 1 : 0);
+        if (from < target) target--;
+        clearMarks();
+        if (from >= 0) reorder(id, target);
+      });
+      handle.addEventListener('keydown', e => { if (e.altKey && ['ArrowUp','ArrowDown'].includes(e.key)) { e.preventDefault(); reorder(station.id, selected.indexOf(station.id)+(e.key==='ArrowUp'?-1:1)); } });
+      item.append(handle);
+    }
+    item.append(star, element('span', 'catalogue-name', station.name));
+    if (station.number != null) {
+      item.classList.add('numbered');
+      const keys = element('span', 'channel-number');
+      for (const digit of String(station.number)) keys.append(element('kbd', 'channel-key', digit));
+      item.append(keys);
+    }
     holder.append(item);
   }
 }
@@ -145,7 +284,7 @@ function updateToolbar() {
   if (!draft) return;
   const normalize = value => JSON.stringify({
     language: value.language || 'auto',
-    favorites: Object.fromEntries(Object.entries(value.favorites).map(([k,v]) => [k,[...v].sort()])),
+    favorites: Object.fromEntries(Object.entries(value.favorites).map(([k,v]) => [k,[...v]])),
     groups: value.groups.map(g => ({...g, stationIds: [...g.stationIds].sort()}))
   });
   const dirty = normalize(draft) !== normalize(saved);
@@ -208,7 +347,7 @@ function renderGroups(focusIndex = -1) {
         language: value.language || 'auto',
     favorites: Object.fromEntries(
           Object.entries(value.favorites).map(
-            ([k, v]) => [k, [...v].sort()]
+            ([k, v]) => [k, [...v]]
           )
         ),
         groups: value.groups
@@ -313,7 +452,7 @@ function renderGroups(focusIndex = -1) {
       label.append(check, document.createTextNode(` ${station.name}`));
       members.append(label);
     }
-    if (!catalogue.length) members.append(element('span', 'settings-description', t('Radio catalogue available in Phase 2.')));
+    if (!catalogue.length) members.append(element('span', 'settings-description', t('No stations found.')));
     card.append(top, controls, members);
     groupEditor.append(card);
   });
@@ -350,6 +489,8 @@ function openSettings() {
 
 function closeSettings() {
   if (saving) return;
+  ++searchGeneration;
+  document.getElementById('radio-search').disabled = document.getElementById('radio-more').disabled = false;
   editing = false;
   window.easyTV.setSettingsScreenOpen(false);
   page.hidden = true;
@@ -403,6 +544,10 @@ async function initialize() {
     window.easyTV.getChannels(), window.easyTV.getAppInfo(), window.easyTV.getPreferences(), window.easyTV.getI18n()
   ]);
   tvs = channels;
+  radios = await window.easyTV.getRadios();
+  document.getElementById('radio-clear').addEventListener('click', clearRadioSearch);
+  document.getElementById('radio-search').addEventListener('click',()=>searchRadio());
+  document.getElementById('radio-more').addEventListener('click',()=>searchRadio(true));
   saved = preferences;
   localeData = i18n;
   appInfo = info;

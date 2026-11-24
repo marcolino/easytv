@@ -24,7 +24,9 @@
       <h3 data-i18n="Television — catalogue and favorites">Television — catalogue and favorites</h3>
       <div id="tv-catalogue" class="catalogue"></div>
       <h3 data-i18n="Radio — catalogue and favorites">Radio — catalogue and favorites</h3>
-      <p class="settings-description" data-i18n="Radio catalogue and playback will be available in Phase 2.">Radio catalogue and playback will be available in Phase 2.</p>
+      <details id="radio-search-panel"><summary data-i18n="Search radio stations">Search radio stations</summary>
+      <div class="radio-search-row"><label><span data-i18n="Station name">Station name</span><input id="radio-name"></label><label><span data-i18n="Country code">Country code</span><input id="radio-country" value="IT" maxlength="2"></label><label><span data-i18n="Genre">Genre</span><input id="radio-genre"></label><button id="radio-search" data-i18n="Search">Search</button><button id="radio-clear" type="button" data-i18n="Clear search">Clear search</button></div>
+      <p id="radio-status" role="status"></p><div id="radio-results"></div><button id="radio-more" hidden data-i18n="Next page">Next page</button></details>
       <div id="radio-catalogue" class="catalogue"></div>
       <details id="groups-panel"><summary data-i18n="Groups">Groups</summary>
       <div id="groups-editor"></div>

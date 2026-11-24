@@ -67,3 +67,49 @@ button:focus-visible, input:focus-visible { outline: 2px solid #58d68d; outline-
 .language-row { display:flex; align-items:center; gap:16px; margin:12px 0; }
 .language-row select { background:#222a38; color:white; border:1px solid #525c6f; border-radius:6px; padding:8px; font:inherit; }
 .language-row select:focus-visible { outline:2px solid #58d68d; }
+.radio-search-row {display:flex;gap:8px;align-items:end;flex-wrap:wrap;margin:10px 0}
+.radio-search-row label {display:flex;flex-direction:column;gap:4px}
+.radio-search-row input {width:140px;padding:6px;background:#151922;color:white;border:1px solid #525c6f}
+#radio-results .catalogue-item {display:flex;gap:8px;justify-content:space-between;margin:4px 0}
+
+#radio-results .catalogue-item { justify-content: flex-start; }
+.result-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.radio-logo-holder { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.radio-logo-holder img { width: 100%; height: 100%; object-fit: contain; }
+.result-logo { width: 40px; height: 40px; }
+.radio-logo-fallback { color: #aab2c0; font-size: 24px; }
+#settings-page .radio-add { background: #276749; white-space: nowrap; }
+#settings-page .radio-add:hover { background: #36865e; }
+#settings-page .radio-preview { white-space: nowrap; }
+.yellow-star { color: #facc15; }
+#settings-page .drag-handle { cursor: grab; padding: 4px; color: #aab2c0; background: transparent; border: 0; }
+#settings-page .drag-handle:active { cursor: grabbing; }
+
+/* Catalogue keycaps and drag insertion indicators */
+.catalogue .catalogue-item { position: relative; min-height: 44px; }
+.catalogue .catalogue-item.numbered { padding-bottom: 20px; }
+.catalogue .channel-number { right: 6px; bottom: 4px; }
+.catalogue-name { min-width: 0; overflow-wrap: anywhere; }
+.catalogue .dragging { opacity: .4; }
+.catalogue .drop-before::before, .catalogue .drop-after::after {
+  content: ''; position: absolute; top: 0; bottom: 0; width: 4px;
+  background: #58d68d; border-radius: 3px; z-index: 1; pointer-events: none;
+}
+.catalogue .drop-before::before { left: -3px; }
+.catalogue .drop-after::after { right: -3px; }
+#radio-search-panel { margin-bottom: 20px; }
+
+/* Remove from favorites */
+#settings-page .radio-add.radio-remove {
+  background: #71333c;
+}
+#settings-page .radio-add.radio-remove:hover {
+  background: #93434e;
+}
+
+/* Sticky settings toolbar separator */
+.settings-toolbar {
+  border-bottom: 1px solid #303641;
+  padding-bottom: 10px;
+  margin-bottom: 10px;
+}

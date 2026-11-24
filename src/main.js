@@ -6,7 +6,9 @@ const {
 const path = require('node:path');
 const { execFile } = require('node:child_process');
 const channels = require('./tvs.json');
-const radios = require('./radios.json');
+const { createRadioCatalogue } = require('./radio-browser');
+const radioCatalogue = createRadioCatalogue(app, require('./radios.json'));
+const radios = radioCatalogue.radios;
 const { dictionaries, languages, resolveLanguage, translate } = require('./i18n');
 const { createPreferences } = require('./preferences');
 const buildInfo = require('./build-info.json');
@@ -28,6 +30,7 @@ let mainWindow = null;
 let streamWindow = null;
 let tray = null;
 let currentChannelId = null;
+let currentRadioId = null;
 
 // Conventional TV-style numeric channel selection.
 let channelDigits = '';
@@ -182,7 +185,7 @@ function handleRemoteInput(event, input) {
   if (key === 'PageUp') {
     event.preventDefault();
     cancelChannelNumber();
-    changeChannel(+1);
+    currentRadioId ? changeRadio(+1) : changeChannel(+1);
     return true;
   }
 
@@ -190,7 +193,7 @@ function handleRemoteInput(event, input) {
   if (key === 'PageDown') {
     event.preventDefault();
     cancelChannelNumber();
-    changeChannel(-1);
+    currentRadioId ? changeRadio(-1) : changeChannel(-1);
     return true;
   }
 
@@ -272,9 +275,9 @@ function createMainWindow() {
   const startupWindow = mainWindow;
   startupWindow.loadFile(path.join(__dirname, 'renderer/index.html'));
   const saved = preferences.get().lastStation;
-  if (saved?.type === 'tv' && channels.some(c => c.id === saved.id)) {
+  if (saved && (saved.type === 'tv' ? channels : radios).some(c => c.id === saved.id)) {
     startupWindow.webContents.once('did-finish-load', () => {
-      if (!startupWindow.isDestroyed() && !streamWindow) openChannel(saved.id);
+      if (!startupWindow.isDestroyed() && !streamWindow) (saved.type === 'radio' ? openRadio(saved.id) : openChannel(saved.id));
     });
   }
 
@@ -473,6 +476,32 @@ function enableStreamEscapeShortcut(window) {
 // Streaming window
 // ------------------------------------------------------------
 
+function changeRadio(direction) {
+  const ids = preferences.get().favorites.radio.filter(id => radios.some(r => r.id === id));
+  if (!ids.length) return;
+  const index = ids.indexOf(currentRadioId);
+  openRadio(ids[index < 0 ? (direction > 0 ? 0 : ids.length - 1) : (index + direction + ids.length) % ids.length]);
+}
+function openRadio(id, preview = false) {
+  const station = radios.find(r => r.id === id);
+  if (!station) return;
+  if (!preview) try { preferences.remember('radio', id); } catch (e) { console.error(e); }
+  const previous = streamWindow;
+  const win = new BrowserWindow({fullscreen:true,autoHideMenuBar:true,title:station.name,webPreferences:{preload:path.join(__dirname,'preload.js'),contextIsolation:true,nodeIntegration:false,sandbox:true}});
+  streamWindow = win;
+  currentRadioId = id;
+  currentChannelId = null;
+  if (previous && !previous.isDestroyed()) previous.close();
+  win.webContents.on('before-input-event',(event,input)=>{
+    if (handleAppShortcut(event,input,true)) return;
+    if (input.type !== 'keyDown') return;
+    if (handleRemoteInput(event,input)) return;
+    if (input.key === 'Escape') {event.preventDefault();win.close();}
+  });
+  win.on('closed',()=>{if(streamWindow!==win)return;streamWindow=null;currentRadioId=null;if(mainWindow&&!mainWindow.isDestroyed()){mainWindow.show();mainWindow.focus();}});
+  win.loadFile(path.join(__dirname,'renderer/radio.html'));
+}
+
 function openChannel(channelId) {
   const channel = channels.find(item => item.id === channelId);
   if (!channel) return;
@@ -484,6 +513,7 @@ function openChannel(channelId) {
       ? streamWindow
       : null;
 
+  currentRadioId = null;
   currentChannelId = channel.id;
 
   // Register the replacement before closing the previous stream.
@@ -845,6 +875,13 @@ async function requestPowerOff() {
 // IPC
 // ------------------------------------------------------------
 
+ipcMain.handle('get-radios', () => radios);
+ipcMain.handle('search-radios', (event, query) => { if(event.sender !== mainWindow?.webContents) throw Error('Unauthorized'); return radioCatalogue.search(query); });
+ipcMain.handle('add-radio', (event,id) => { if(event.sender !== mainWindow?.webContents) throw Error('Unauthorized'); return radioCatalogue.add(id); });
+ipcMain.handle('open-radio', (event,id,preview) => { if(event.sender !== mainWindow?.webContents) throw Error('Unauthorized'); openRadio(id,preview === true); });
+ipcMain.handle('current-radio', (event) => { if(event.sender !== streamWindow?.webContents || !currentRadioId) return null; return radios.find(r=>r.id===currentRadioId); });
+ipcMain.handle('radio-home', (event) => { if(event.sender === streamWindow?.webContents && currentRadioId) streamWindow.close(); });
+ipcMain.handle('radio-step', (event,direction) => { if(event.sender === streamWindow?.webContents && currentRadioId) changeRadio(direction === -1 ? -1 : 1); });
 ipcMain.handle('get-channels', () => channels);
 
 ipcMain.handle('get-app-info', () => ({

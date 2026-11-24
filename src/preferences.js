@@ -5,17 +5,18 @@ const path = require('node:path');
 function createPreferences(app, tvs, radios) {
   const file = path.join(app.getPath('userData'), 'settings.json');
   const tvIds = new Set(tvs.map(x => x.id));
-  const radioIds = new Set(radios.map(x => x.id));
+  const radioIds = { has: id => radios.some(x => x.id === id) };
   const defaults = {
     language: 'auto',
     lastStation: null,
-    favorites: { tv: tvs.map(x => x.id), radio: [] },
+    favorites: { tv: tvs.map(x => x.id), radio: radios.filter(x => x.favorite === true).map(x => x.id) },
     groups: [
       { id: 'rai', name: 'RAI', type: 'tv', visible: true, stationIds: tvs.filter(x => x.group === 'RAI').map(x => x.id) },
       { id: 'mediaset', name: 'MEDIASET', type: 'tv', visible: true, stationIds: tvs.filter(x => x.group === 'MEDIASET').map(x => x.id) },
       { id: 'altri', name: 'ALTRI CANALI', type: 'tv', visible: true, stationIds: tvs.filter(x => x.group === 'ALTRI').map(x => x.id) }
     ]
   };
+  for (const name of new Set(radios.map(r => r.group || 'Radio'))) defaults.groups.push({id:'radio-'+defaults.groups.length,name,type:'radio',visible:true,stationIds:radios.filter(r=>(r.group || 'Radio')===name).map(r=>r.id)});
   let data = structuredClone(defaults);
   try {
     const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
