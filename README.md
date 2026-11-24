@@ -1,6 +1,6 @@
 # EasyTV
 
-EasyTV is a simple desktop application for watching live TV channels from your computer.
+EasyTV is a simple desktop application for watching live TV channels and listening to internet radio stations from your computer.
 
 It provides a fullscreen channel-selection window and opens the selected stream in a separate fullscreen window. Channels can be selected with the mouse, keyboard, or a suitably configured infrared remote control.
 
@@ -23,6 +23,14 @@ It provides a fullscreen channel-selection window and opens the selected stream 
 - Application version and automatically incremented package build number.
 - Persistent browser session for streaming websites.
 - Widevine DRM support through Castlabs Electron.
+
+- Separate TV and radio favorites, configurable groups and drag-and-drop ordering.
+- Search IPTV-org and Radio Browser, with automatic delayed search, previews and manual station entry.
+- Direct HLS TV playback using hls.js, with optional fallback to the official web player.
+- Radio player with audio visualization where supported, and automatic reconnection.
+- Automatic logo lookup, manual logo search and preview.
+- English, Italian, French and German, with automatic system-language selection.
+- Undoable deletions and temporary toast notifications.
 
 ## Supported platforms
 
@@ -56,7 +64,7 @@ macOS builds are currently experimental and intended for testing on Apple Silico
 
 ## Usage
 
-1. Launch EasyTV. The channel-selection window starts fullscreen.
+1. Launch EasyTV. The last selected station is restored when available; otherwise the fullscreen Home is shown.
 2. Click a channel, or enter its channel number using the keyboard.
 3. The stream opens in a separate fullscreen window.
 4. Press `Esc` while streaming to close the stream and return to channel selection.
@@ -72,10 +80,10 @@ The channel-selection buttons remain clickable and keyboard-accessible. Their lo
 | 2 | Rai 2 | 8 | TV8 |
 | 3 | Rai 3 | 9 | NOVE |
 | 4 | Rete 4 | 48 | Rai News 24 |
-| 5 | Canale 5 | | |
+| 5 | Canale 5 | 51 | TGCOM24 |
 | 6 | Italia 1 | | |
 
-Numbers are defined explicitly in `src/channels.js`; they are independent of the order of the buttons on screen.
+Original numbers are defined in `src/tvs.json`; imported and manual TV channels may have a unique optional number. Numbers are independent of the order of the buttons on screen.
 
 ### Keyboard and infrared-remote controls
 
@@ -88,6 +96,8 @@ Numbers are defined explicitly in `src/channels.js`; they are independent of the
 | `Home` | Home | Close streaming and return to the channel list |
 | `PageUp` | CH+ | Next available channel in numeric order |
 | `PageDown` | CH− | Previous available channel in numeric order |
+| `F2` | — | Open settings |
+| `F10` | — | Off / exit |
 | `F11` (main window) | — | Toggle main-window fullscreen |
 
 Numeric entry waits **1.5 seconds** after the last digit unless confirmed with `Enter`. For example, `4`, `8` selects Rai News 24. CH+/CH− wrap around at the ends of the channel list.
@@ -106,11 +116,21 @@ EASYTV_TRAY=1 npm start
 
 When enabled, the tray offers **Apri EasyTV**, **Chiudi streaming**, and **Esci**. Closing all windows then leaves EasyTV running in the tray. The environment variable is a development/launch configuration; a packaged-app settings interface has not yet been added.
 
+## Settings and catalogues
+
+Open Settings with F2 or the gear button. Search by station name, country and category/genre, or add a station manually using its stream URL. Preview before adding to favorites. Imported stations are retained locally; catalogue availability does not guarantee playback. Use the pencil to edit a custom station and the red trash button to delete it. Deletions can be undone using the toast for seven seconds. Save favorites, group and language changes using the settings toolbar.
+
+For TV channels with both playback methods, choose **Web**, **Direct** or **Auto**. Auto tries direct playback first and falls back to the official player after recovery attempts fail; it does not detect lip-sync problems. Direct-only stations have no web fallback. The radio spectrum depends on browser audio-analysis compatibility.
+
+On Linux, preferences and catalogues normally reside in `~/.config/easytv/`: `settings.json`, `tv-catalogue.json`, `radio-catalogue.json` and `logo-cache.json`. Stream URLs may expire or be restricted. Use only streams you are authorized to access.
+
 ## Streaming and DRM
 
 Streaming availability and playback quality depend on the broadcaster's website, network connection, and regional restrictions.
 
 Some channels use Widevine DRM. EasyTV uses a Castlabs Electron build with Widevine support. Successful playback may depend on the operating system, browser components, advertisements, and broadcaster changes.
+
+The latest catalogue and player changes have been exercised on Linux; the earlier Windows packaging/playback tests do not establish that every new feature works on Windows or macOS.
 
 ## Support and development
 

@@ -12,7 +12,8 @@ const languages = {
 };
 
 function resolveLanguage(preference, systemLanguages = []) {
-  if (Object.hasOwn(languages, preference)) return preference;
+  if (Object.hasOwn(languages, preference))
+    return preference;
   return systemLanguages.map(x => x.toLowerCase().split(/[-_]/)[0]).find(x => Object.hasOwn(languages, x)) || 'en';
 }
 
@@ -21,5 +22,4 @@ function translate(language, key, values = {}) {
   const text = (Object.hasOwn(dictionary, key) && dictionary[key]) || (Object.hasOwn(dictionaries.en, key) && dictionaries.en[key]) || key.replace(/^\[[^\]]+\]\s*/, '');
   return text.replace(/\{(\w+)\}/g, (match, name) => Object.hasOwn(values, name) ? String(values[name]) : match);
 }
-
 module.exports = { dictionaries, languages, resolveLanguage, translate };

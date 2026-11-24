@@ -1,48 +1,91 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>EasyTV</title>
-  <link rel="stylesheet" href="style.css">
-</head>
-<body>
-  <div id="app-shell">
-    <header>
-      <div><h1>EasyTV <span id="app-version"></span></h1><p id="subtitle" data-i18n="Choose a channel to watch">Choose a channel to watch</p></div>
-      <div class="header-actions">
-        <span class="status" data-i18n="TV streaming">TV streaming</span>
-        <button id="settings-button" class="header-button" type="button" aria-label="Settings" title="Settings">⚙</button>
-        <button id="power-button" class="header-button power-button" type="button" aria-label="Exit" title="Exit">⏻</button>
-      </div>
-    </header>
-    <main id="channels"></main>
-    <main id="settings-page" hidden>
-      <div class="settings-toolbar"><h2 data-i18n="Settings">Settings</h2><div class="toolbar-buttons"><button id="back-button" type="button" data-i18n="Cancel">Cancel</button><button id="save-settings" type="button" data-i18n="Save">Save</button></div></div>
-      <div class="language-row"><label for="language-select" data-i18n="Language">Language</label><select id="language-select"></select></div>
-      <p class="settings-description" data-i18n="Select your TV and radio favorites. Groups can be hidden without losing stations.">Select your TV and radio favorites. Groups can be hidden without losing stations.</p>
-      <h3 data-i18n="Television — catalogue and favorites">Television — catalogue and favorites</h3>
-      <details id="tv-search-panel"><summary data-i18n="Search TV channels">Search TV channels</summary><div class="radio-search-row"><label><span data-i18n="Station name">Station name</span><input id="tv-name"></label><label><span data-i18n="Country code">Country code</span><input id="tv-country" value="IT" maxlength="2"></label><label><span data-i18n="Genre">Genre</span><input id="tv-genre"></label><button id="tv-search" data-i18n="Search">Search</button><button id="tv-clear" data-i18n-title="Clear search" class="clear-icon"></button></div><p id="tv-status" role="status"></p><div id="tv-results"></div><button id="tv-more" hidden data-i18n="Next page">Next page</button></details>
-<details id="manual-tv-panel"><summary data-i18n="Add channel manually">Add channel manually</summary><div class="manual-tv-fields"><label><span data-i18n="Station name">Station name</span><input id="manual-name" placeholder="Rai 4"></label><label><span data-i18n="Stream URL">Stream URL</span><input id="manual-directUrl" placeholder="https://…/index.m3u8"></label><label><span data-i18n="Channel number">Channel number</span><input id="manual-number" placeholder="125"></label><label><span data-i18n="Logo URL">Logo URL</span><span class="logo-input-row"><input id="manual-logo" placeholder="https://…/logo.png"><button type="button" id="manual-find-logo" data-i18n="Find logo" data-i18n-title="Find logo">Find logo</button></span><span id="manual-logo-preview" class="manual-logo-preview" aria-live="polite" hidden></span></label><label><span data-i18n="Official player URL">Official player URL</span><input id="manual-url" placeholder="https://…"></label></div><button id="manual-preview" data-i18n="Watch">Watch</button> <button id="manual-save" data-i18n="Save channel">Save channel</button> <button id="manual-clear" data-i18n-title="Clear search" class="clear-icon"></button><p id="manual-status" role="status"></p></details>
-<div id="tv-catalogue" class="catalogue"></div>
-      <h3 data-i18n="Radio — catalogue and favorites">Radio — catalogue and favorites</h3>
-      <details id="radio-search-panel"><summary data-i18n="Search radio stations">Search radio stations</summary>
-      <div class="radio-search-row"><label><span data-i18n="Station name">Station name</span><input id="radio-name"></label><label><span data-i18n="Country code">Country code</span><input id="radio-country" value="IT" maxlength="2"></label><label><span data-i18n="Genre">Genre</span><input id="radio-genre"></label><button id="radio-search" data-i18n="Search">Search</button><button id="radio-clear" type="button" data-i18n-title="Clear search" class="clear-icon"></button></div>
-      <p id="radio-status" role="status"></p><div id="radio-results"></div><button id="radio-more" hidden data-i18n="Next page">Next page</button></details>
-<details id="manual-radio-panel"><summary data-i18n="Add radio station manually">Add radio station manually</summary><div class="manual-tv-fields"><label><span data-i18n="Station name">Station name</span><input id="manual-radio-name" placeholder="Radio Example"></label><label><span data-i18n="Stream URL">Stream URL</span><input id="manual-radio-url" placeholder="https://…/stream.mp3"></label><label><span data-i18n="Logo URL">Logo URL</span><span class="logo-input-row"><input id="manual-radio-logo" placeholder="https://…/logo.png"><button type="button" id="manual-radio-find-logo" data-i18n="Find logo" data-i18n-title="Find logo">Find logo</button></span><span id="manual-radio-logo-preview" class="manual-logo-preview" aria-live="polite" hidden></span></label><label><span data-i18n="Country code">Country code</span><input id="manual-radio-country" placeholder="IT"></label><label><span data-i18n="Genre">Genre</span><input id="manual-radio-genre" placeholder="Jazz"></label><label><span data-i18n="FM frequency">FM frequency</span><input id="manual-radio-frequency" placeholder="102.5 MHz"></label><label><span data-i18n="Official website">Official website</span><input id="manual-radio-homepage" placeholder="https://…"></label></div><button id="manual-radio-preview" data-i18n="Preview">Preview</button> <button id="manual-radio-save" data-i18n="Save station">Save station</button> <button id="manual-radio-clear" data-i18n-title="Clear search" class="clear-icon"></button></details>
-      <div id="radio-catalogue" class="catalogue"></div>
-      <details id="groups-panel"><summary data-i18n="Groups">Groups</summary>
-      <div id="groups-editor"></div>
-      <div class="settings-actions">
-        <button id="add-tv-group" type="button" data-i18n="Add TV group">Add TV group</button>
-        <button id="add-radio-group" type="button" data-i18n="Add radio group">Add radio group</button>
-
-      </div>
-      </details>
-      
-    </main>
-  </div>
-  <div id="undo-stack"></div><div id="settings-message" hidden><span id="toast-text" role="status" aria-live="polite"></span><button id="toast-close" type="button" data-i18n-title="Close notification"></button></div>
-  <script src="app.js"></script>
-</body>
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>EasyTV</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <div id="app-shell">
+      <header>
+        <div>
+          <h1>EasyTV <span id="app-version"></span></h1>
+          <p id="subtitle" data-i18n="Choose a channel to watch">Choose a channel to watch</p>
+        </div>
+        <div class="header-actions">
+          <span class="status" data-i18n="TV streaming">TV streaming</span><button id="settings-button" class="header-button" type="button" aria-label="Settings" title="Settings">⚙</button><button id="power-button" class="header-button power-button" type="button" aria-label="Exit" title="Exit">⏻</button>
+        </div>
+      </header>
+      <main id="channels">
+      </main>
+      <main id="settings-page" hidden>
+        <div class="settings-toolbar">
+          <h2 data-i18n="Settings">Settings</h2>
+          <div class="toolbar-buttons">
+            <button id="back-button" type="button" data-i18n="Cancel">Cancel</button><button id="save-settings" type="button" data-i18n="Save">Save</button>
+          </div>
+        </div>
+        <div class="language-row">
+          <label for="language-select" data-i18n="Language">Language</label><select id="language-select"></select>
+        </div>
+        <p class="settings-description" data-i18n="Select your TV and radio favorites. Groups can be hidden without losing stations.">Select your TV and radio favorites. Groups can be hidden without losing stations.</p>
+        <h3 data-i18n="Television — catalogue and favorites">Television — catalogue and favorites</h3>
+        <details id="tv-search-panel">
+          <summary data-i18n="Search TV channels">Search TV channels</summary>
+          <div class="radio-search-row">
+            <label><span data-i18n="Station name">Station name</span><input id="tv-name"></label><label><span data-i18n="Country code">Country code</span><input id="tv-country" value="IT" maxlength="2"></label><label><span data-i18n="Genre">Genre</span><input id="tv-genre"></label><button id="tv-search" data-i18n="Search">Search</button><button id="tv-clear" data-i18n-title="Clear search" class="clear-icon"></button>
+          </div>
+          <p id="tv-status" role="status"></p>
+          <div id="tv-results">
+          </div>
+          <button id="tv-more" hidden data-i18n="Next page">Next page</button>
+        </details>
+        <details id="manual-tv-panel">
+          <summary data-i18n="Add channel manually">Add channel manually</summary>
+          <div class="manual-tv-fields">
+            <label><span data-i18n="Station name">Station name</span><input id="manual-name" placeholder="Rai 4"></label><label><span data-i18n="Stream URL">Stream URL</span><input id="manual-directUrl" placeholder="https://…/index.m3u8"></label><label><span data-i18n="Channel number">Channel number</span><input id="manual-number" placeholder="125"></label><label><span data-i18n="Logo URL">Logo URL</span><span class="logo-input-row"><input id="manual-logo" placeholder="https://…/logo.png"><button type="button" id="manual-find-logo" data-i18n="Find logo" data-i18n-title="Find logo">Find logo</button></span><span id="manual-logo-preview" class="manual-logo-preview" aria-live="polite" hidden></span></label><label><span data-i18n="Official player URL">Official player URL</span><input id="manual-url" placeholder="https://…"></label>
+          </div>
+          <button id="manual-preview" data-i18n="Watch">Watch</button> <button id="manual-save" data-i18n="Save channel">Save channel</button> <button id="manual-clear" data-i18n-title="Clear search" class="clear-icon"></button>
+          <p id="manual-status" role="status"></p>
+        </details>
+        <div id="tv-catalogue" class="catalogue">
+        </div>
+        <h3 data-i18n="Radio — catalogue and favorites">Radio — catalogue and favorites</h3>
+        <details id="radio-search-panel">
+          <summary data-i18n="Search radio stations">Search radio stations</summary>
+          <div class="radio-search-row">
+            <label><span data-i18n="Station name">Station name</span><input id="radio-name"></label><label><span data-i18n="Country code">Country code</span><input id="radio-country" value="IT" maxlength="2"></label><label><span data-i18n="Genre">Genre</span><input id="radio-genre"></label><button id="radio-search" data-i18n="Search">Search</button><button id="radio-clear" type="button" data-i18n-title="Clear search" class="clear-icon"></button>
+          </div>
+          <p id="radio-status" role="status"></p>
+          <div id="radio-results">
+          </div>
+          <button id="radio-more" hidden data-i18n="Next page">Next page</button>
+        </details>
+        <details id="manual-radio-panel">
+          <summary data-i18n="Add radio station manually">Add radio station manually</summary>
+          <div class="manual-tv-fields">
+            <label><span data-i18n="Station name">Station name</span><input id="manual-radio-name" placeholder="Radio Example"></label><label><span data-i18n="Stream URL">Stream URL</span><input id="manual-radio-url" placeholder="https://…/stream.mp3"></label><label><span data-i18n="Logo URL">Logo URL</span><span class="logo-input-row"><input id="manual-radio-logo" placeholder="https://…/logo.png"><button type="button" id="manual-radio-find-logo" data-i18n="Find logo" data-i18n-title="Find logo">Find logo</button></span><span id="manual-radio-logo-preview" class="manual-logo-preview" aria-live="polite" hidden></span></label><label><span data-i18n="Country code">Country code</span><input id="manual-radio-country" placeholder="IT"></label><label><span data-i18n="Genre">Genre</span><input id="manual-radio-genre" placeholder="Jazz"></label><label><span data-i18n="FM frequency">FM frequency</span><input id="manual-radio-frequency" placeholder="102.5 MHz"></label><label><span data-i18n="Official website">Official website</span><input id="manual-radio-homepage" placeholder="https://…"></label>
+          </div>
+          <button id="manual-radio-preview" data-i18n="Preview">Preview</button> <button id="manual-radio-save" data-i18n="Save station">Save station</button> <button id="manual-radio-clear" data-i18n-title="Clear search" class="clear-icon"></button>
+        </details>
+        <div id="radio-catalogue" class="catalogue">
+        </div>
+        <details id="groups-panel">
+          <summary data-i18n="Groups">Groups</summary>
+          <div id="groups-editor">
+          </div>
+          <div class="settings-actions">
+            <button id="add-tv-group" type="button" data-i18n="Add TV group">Add TV group</button><button id="add-radio-group" type="button" data-i18n="Add radio group">Add radio group</button>
+          </div>
+        </details>
+      </main>
+    </div>
+    <div id="undo-stack">
+    </div>
+    <div id="settings-message" hidden>
+      <span id="toast-text" role="status" aria-live="polite"></span><button id="toast-close" type="button" data-i18n-title="Close notification"></button>
+    </div>
+    <script src="app.js"></script>
+  </body>
 </html>

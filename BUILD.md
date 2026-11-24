@@ -79,13 +79,21 @@ The tray is disabled by default. When enabled, it offers **Apri EasyTV**, **Chiu
 
 ## npm scripts
 
-The following is the recommended simplified script naming scheme. Check your local `package.json` if you have not yet applied that cleanup.
+The following commands are defined in the current `package.json`.
 
 | Command | Purpose | Increments build number? |
 |---|---|---|
 | `npm start` | Development launch using XWayland | No |
 | `npm run start:wayland` | Development launch using native Wayland | No |
-| `npm run check` | JavaScript syntax checks | No |
+| `npm run check` | JavaScript syntax and translation checks | No |
+| `npm run start:tvset` | Linux TV appliance mode (shutdown after confirmation) | No |
+| `npm run i18n:sync` | Add missing translation keys | No |
+| `npm run i18n:check` | Validate translations | No |
+| `npm run i18n:prune -- --dry-run` | Preview unused keys | No |
+| `npm run i18n:prune` | Remove unused keys | No |
+| `npm run i18n:translate` | Sync and translate using MyMemory | No |
+| `npm run i18n` | Translate and check | No |
+| `npm run build` | Translation checks and Windows/Linux packages | Yes (per target) |
 | `npm run build:win` | Windows x64 NSIS installer | Yes |
 | `npm run build:linux` | Linux x64 Debian package | Yes |
 | `npm run pack:linux` | Unpacked Linux application | Yes |
@@ -107,6 +115,14 @@ With this naming scheme, npm runs `prebuild:win`, `prebuild:linux`, or `prepack:
 - Running `npm start` after a build displays the most recently stored build number; it does not generate a new one.
 
 Use `npm run build:win` / `npm run build:linux` rather than invoking `npx electron-builder` directly if you want automatic build numbering. Direct electron-builder commands bypass npm's pre-script hooks.
+
+## Source maintenance
+
+Use two spaces for indentation (no tabs) and a blank line between function declarations. Keep genuine runtime errors and build/translation command output; avoid routine development logging. The direct TV player depends on `hls.js`, installed by `npm install`. FFmpeg and VLC are optional diagnostic tools, not runtime dependencies.
+
+Translation dictionaries are in `src/locales/` (en, it, fr, de). Review the dry-run output before pruning: the static scanner may miss dynamically constructed keys. Do not automatically prune during packaging.
+
+Original stations are in `src/tvs.json` and `src/radios.json`. The main process manages persistent user catalogues, preferences and logo lookup. Renderer files contain the Home/settings interface and separate TV and radio players. Keep broadcaster-specific web-player code intact when changing direct playback.
 
 ## Build configuration
 
@@ -249,6 +265,15 @@ Windows Canale 5 playback, including after advertising, has been tested successf
 - [ ] Optional tray behavior works when enabled (macOS menu-bar equivalent).
 - [ ] Application quits and restarts normally.
 - [ ] Widevine-protected streams work on physical Apple Silicon hardware.
+
+## Catalogue and player regression tests
+
+- [ ] Search TV and radio, clear searches and test delayed search and pagination.
+- [ ] Preview, import, manually add, edit and delete stations; test undo and persistence.
+- [ ] Verify logo search and preview, favorites, groups, ordering and all four languages.
+- [ ] Verify direct HLS, official web playback, Auto fallback and radio reconnection.
+- [ ] Verify F2, F10, numeric selection, fullscreen, channel banner and cursor hiding.
+- [ ] Test on each target OS; successful Linux playback does not establish cross-platform compatibility.
 
 ## Release considerations
 
