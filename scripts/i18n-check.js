@@ -5,11 +5,11 @@ const sync = process.argv.includes('--sync');
 const prune = process.argv.includes('--prune');
 const dryRun = process.argv.includes('--dry-run');
 if (sync && prune) throw new Error('Use --sync and --prune separately');
-const identicalOK = {it: ['Radio','TV'], fr: ['Radio','TV','Genre'], de: ['Radio','TV','Genre']};
+const identicalOK = {it: ['Radio','TV','Web','Auto'], fr: ['Radio','TV','Genre','Web','Auto','Direct'], de: ['Radio','TV','Genre','Web','Auto']};
 const keys = new Set();
-for (const file of ['main.js','renderer/app.js','renderer/index.html','renderer/radio.js','renderer/radio.html']) {
+for (const file of ['main.js','renderer/app.js','renderer/index.html','renderer/radio.js','renderer/radio.html','renderer/tv.js','renderer/tv.html']) {
   const source = fs.readFileSync(path.join(root,file),'utf8');
-  for (const m of source.matchAll(/\bt\(\s*(['"])(.*?)\1\s*[,)]|data-i18n="([^"]+)"/g)) keys.add(m[2] || m[3]);
+  for (const m of source.matchAll(/\bt\(\s*(['"])(.*?)\1\s*[,)]|data-i18n(?:-title)?="([^"]+)"/g)) keys.add(m[2] || m[3]);
 }
 // Conditional translation calls cannot be extracted by the literal scanner.
 for (const key of ['TV','Radio','Shut down the device','Exit EasyTV']) keys.add(key);

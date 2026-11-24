@@ -5,7 +5,8 @@ const {
 
 const path = require('node:path');
 const { execFile } = require('node:child_process');
-const channels = require('./tvs.json');
+const tvCatalogue = require('./tv-catalogue').createTVCatalogue(app, require('./tvs.json'));
+const channels = tvCatalogue.channels;
 const { createRadioCatalogue } = require('./radio-browser');
 const radioCatalogue = createRadioCatalogue(app, require('./radios.json'));
 const radios = radioCatalogue.radios;
@@ -502,11 +503,15 @@ function openRadio(id, preview = false) {
   win.loadFile(path.join(__dirname,'renderer/radio.html'));
 }
 
-function openChannel(channelId) {
+function openChannel(channelId, forceWeb = false, preview = false) {
   const channel = channels.find(item => item.id === channelId);
   if (!channel) return;
-  try { preferences.remember('tv', channel.id); }
+  if (!preview) try { preferences.remember('tv', channel.id); }
   catch (error) { console.error('EasyTV: unable to remember channel:', error); }
+
+  const mode = preferences.get().tvPlayback?.[channel.id] || 'web';
+  if (channel.directUrl && (preview || !channel.url || (!forceWeb && mode !== 'web'))) return openDirectTV(channel, preview || !channel.url ? 'direct' : mode);
+  if (!channel.url) return;
 
   const previousWindow =
     streamWindow && !streamWindow.isDestroyed()
@@ -788,6 +793,29 @@ function openChannel(channelId) {
     enableStreamEscapeShortcut(currentWindow);
   }
 
+  // One banner per channel selection; do not repeat it on automatic fallback.
+  if (!forceWeb) currentWindow.webContents.once('did-finish-load', () => {
+    if (currentWindow.isDestroyed() || streamWindow !== currentWindow) return;
+    currentWindow.webContents.executeJavaScript(`(() => {
+      const name = ${JSON.stringify(channel.name)};
+      const started = Date.now();
+      const timer = setInterval(() => {
+        const videos = [...document.querySelectorAll('video')];
+        if (!videos.some(v => !v.paused && v.readyState >= 2) && Date.now() - started < 10000) return;
+        clearInterval(timer);
+        const host = document.fullscreenElement || document.body;
+        if (!host || /^(VIDEO|IFRAME)$/.test(host.tagName)) return;
+        const banner = document.createElement('div');
+        banner.textContent = name;
+        Object.assign(banner.style, {position:'fixed', inset:'0', display:'flex', alignItems:'center', justifyContent:'center', pointerEvents:'none', zIndex:'2147483647', color:'gold', fontFamily:'Arial Rounded MT Bold, Trebuchet MS, system-ui, sans-serif', fontWeight:'600', fontSize:'46vh', lineHeight:'1', whiteSpace:'nowrap', opacity:'0.7', textShadow:'0 2px 12px #0005', transition:'opacity .5s'});
+        host.appendChild(banner);
+        const range = document.createRange(); range.selectNodeContents(banner);
+        const width = range.getBoundingClientRect().width;
+        if (width > innerWidth * .92) banner.style.fontSize = (innerHeight * .46 * innerWidth * .92 / width) + 'px';
+        setTimeout(() => { banner.style.opacity = '0'; setTimeout(() => banner.remove(), 500); }, 1500);
+      }, 250);
+    })()`).catch(error => console.debug('Channel banner:', error.message));
+  });
   currentWindow.loadURL(channel.url);
 }
 
@@ -875,9 +903,30 @@ async function requestPowerOff() {
 // IPC
 // ------------------------------------------------------------
 
-ipcMain.handle('get-radios', () => radios);
+let directTV = null;
+function openDirectTV(channel, mode) {
+  const previous = streamWindow;
+  const win = new BrowserWindow({fullscreen:true, autoHideMenuBar:true, title:channel.name,
+    webPreferences:{preload:path.join(__dirname,'preload.js'),contextIsolation:true,nodeIntegration:false,sandbox:true}});
+  streamWindow = win; currentRadioId = null; currentChannelId = channel.id;
+  directTV = {win, channel, mode};
+  if (previous && !previous.isDestroyed()) previous.close();
+  win.webContents.setWindowOpenHandler(() => ({action:'deny'}));
+  win.webContents.on('will-navigate', e => e.preventDefault());
+  win.webContents.on('before-input-event',(event,input)=>{
+    if (handleAppShortcut(event,input,true)) return;
+    if (input.type !== 'keyDown' || handleRemoteInput(event,input)) return;
+    if (input.key === 'Escape') {event.preventDefault();win.close();}
+    if (input.key === 'F12') {event.preventDefault();win.webContents.toggleDevTools();}
+  });
+  win.on('closed',()=>{if(directTV?.win===win)directTV=null;if(streamWindow!==win)return;streamWindow=null;currentChannelId=null;if(mainWindow&&!mainWindow.isDestroyed()){mainWindow.show();mainWindow.focus();}});
+  win.loadFile(path.join(__dirname,'renderer/tv.html')).catch(error=>{console.error('Direct TV:',error);if(streamWindow===win && mode==='auto')openChannel(channel.id,true);});
+}
+ipcMain.handle('current-direct-tv', event => directTV && event.sender === directTV.win.webContents ? {channel:directTV.channel,mode:directTV.mode} : null);
+ipcMain.handle('direct-tv-web', event => {if(directTV && event.sender === directTV.win.webContents && streamWindow===directTV.win && directTV.channel.url)openChannel(directTV.channel.id,true);});
+ipcMain.handle('get-radios', () => radios.map(s=>({...s,editable:!radioCatalogue.originalIds.has(s.id)})));
 ipcMain.handle('search-radios', (event, query) => { if(event.sender !== mainWindow?.webContents) throw Error('Unauthorized'); return radioCatalogue.search(query); });
-ipcMain.handle('add-radio', (event,id) => { if(event.sender !== mainWindow?.webContents) throw Error('Unauthorized'); return radioCatalogue.add(id); });
+ipcMain.handle('add-radio', (event,id) => { if(event.sender !== mainWindow?.webContents) throw Error('Unauthorized'); return {...radioCatalogue.add(id),editable:!radioCatalogue.originalIds.has(id)}; });
 ipcMain.handle('open-radio', (event,id,preview) => { if(event.sender !== mainWindow?.webContents) throw Error('Unauthorized'); openRadio(id,preview === true); });
 ipcMain.handle('current-radio', (event) => { if(event.sender !== streamWindow?.webContents || !currentRadioId) return null; return radios.find(r=>r.id===currentRadioId); });
 ipcMain.handle('radio-home', (event) => { if(event.sender === streamWindow?.webContents && currentRadioId) streamWindow.close(); });
@@ -961,4 +1010,24 @@ app.on('before-quit', () => {
   if (streamWindow && !streamWindow.isDestroyed()) {
     streamWindow.destroy();
   }
+});
+
+function tvAuthorized(event){if(event.sender!==mainWindow?.webContents)throw Error('Unauthorized');}
+ipcMain.handle('search-tvs',(e,q)=>{tvAuthorized(e);return tvCatalogue.search(q);});
+ipcMain.handle('import-tv',(e,key)=>{tvAuthorized(e);return tvCatalogue.importChannel(key);});
+ipcMain.handle('save-tv',(e,input,id)=>{tvAuthorized(e);return tvCatalogue.save(input,id);});
+ipcMain.handle('preview-tv',(e,id)=>{tvAuthorized(e);openChannel(id,false,true);});
+const deletedTVs=new Map();
+ipcMain.handle('delete-tv',(e,id)=>{tvAuthorized(e);if(tvCatalogue.originalIds.has(id))throw Error('Cannot delete original channel');const index=tvCatalogue.channels.findIndex(c=>c.id===id);if(index<0)throw Error('Channel not found');const channel=structuredClone(tvCatalogue.channels[index]);const before=preferences.get();preferences.forgetTV(id);tvCatalogue.remove(id);const token=require('node:crypto').randomUUID();deletedTVs.set(token,{channel,index,before});setTimeout(()=>deletedTVs.delete(token),9000);return {token,preferences:preferences.get()};});
+ipcMain.handle('restore-tv',(e,token)=>{tvAuthorized(e);const entry=deletedTVs.get(token);if(!entry)throw Error('Undo expired');const channel=tvCatalogue.restore(entry.channel,entry.index);const prefs=preferences.restoreTV(channel.id,entry.before);deletedTVs.delete(token);return {channel,preferences:prefs};});
+
+const deletedRadios=new Map();
+ipcMain.handle('save-radio',(e,input,id)=>{tvAuthorized(e);return {...radioCatalogue.save(input,id),editable:true};});
+ipcMain.handle('delete-radio',(e,id)=>{tvAuthorized(e);if(radioCatalogue.originalIds.has(id)||!radios.some(s=>s.id===id))throw Error('Station cannot be deleted');const before=preferences.get();preferences.forgetRadio(id);let entry;try{entry=radioCatalogue.remove(id);}catch(err){preferences.restoreRadio(id,before);throw err;}const token=require('node:crypto').randomUUID();deletedRadios.set(token,{...entry,before});setTimeout(()=>deletedRadios.delete(token),9000);return {token,preferences:preferences.get()};});
+ipcMain.handle('restore-radio',(e,token)=>{tvAuthorized(e);const entry=deletedRadios.get(token);if(!entry)throw Error('Undo expired');const station=radioCatalogue.restore(entry.station,entry.index);const prefs=preferences.restoreRadio(station.id,entry.before);deletedRadios.delete(token);return {station:{...station,editable:true},preferences:prefs};});
+
+const logoFinder = require('./logo-finder').createLogoFinder(app);
+ipcMain.handle('find-station-logo', (e, station, kind, force) => {
+  if(e.sender !== mainWindow?.webContents && !(currentRadioId && e.sender === streamWindow?.webContents)) return '';
+  return logoFinder.find(station,kind,force===true);
 });

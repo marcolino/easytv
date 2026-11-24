@@ -5,7 +5,8 @@
     "name": "Rai 1",
     "logo": "rai-1-it.png",
     "group": "RAI",
-    "url": "https://www.raiplay.it/dirette/rai1"
+    "url": "https://www.raiplay.it/dirette/rai1",
+    "directUrl": "https://mediapolis.rai.it/relinker/relinkerServlet.htm?cont=2606803&output=7"
   },
   {
     "id": "rai2",
@@ -13,7 +14,8 @@
     "name": "Rai 2",
     "logo": "rai-2-it.png",
     "group": "RAI",
-    "url": "https://www.raiplay.it/dirette/rai2"
+    "url": "https://www.raiplay.it/dirette/rai2",
+    "directUrl": "https://mediapolis.rai.it/relinker/relinkerServlet.htm?cont=308718&output=7"
   },
   {
     "id": "rai3",
@@ -21,7 +23,8 @@
     "name": "Rai 3",
     "logo": "rai-3-it.png",
     "group": "RAI",
-    "url": "https://www.raiplay.it/dirette/rai3"
+    "url": "https://www.raiplay.it/dirette/rai3",
+    "directUrl": "https://mediapolis.rai.it/relinker/relinkerServlet.htm?cont=308709&output=7"
   },
   {
     "id": "rainews24",
@@ -29,7 +32,8 @@
     "name": "Rai News 24",
     "logo": "rai-news-24-it.png",
     "group": "RAI",
-    "url": "https://www.raiplay.it/dirette/rainews24"
+    "url": "https://www.raiplay.it/dirette/rainews24",
+    "directUrl": "https://mediapolis.rai.it/relinker/relinkerServlet.htm?cont=1&output=7"
   },
   {
     "id": "rete4",
@@ -37,7 +41,8 @@
     "name": "Rete 4",
     "logo": "rete4-it.png",
     "group": "MEDIASET",
-    "url": "https://mediasetinfinity.mediaset.it/diretta/rete4_cR4/"
+    "url": "https://mediasetinfinity.mediaset.it/diretta/rete4_cR4/",
+    "directUrl": "https://live02-seg.msf.cdn.mediaset.net/live/ch-r4/r4-clr.isml/index.m3u8"
   },
   {
     "id": "canale5",
@@ -45,7 +50,8 @@
     "name": "Canale 5",
     "logo": "canale5-it.png",
     "group": "MEDIASET",
-    "url": "https://mediasetinfinity.mediaset.it/diretta/canale5_cC5/"
+    "url": "https://mediasetinfinity.mediaset.it/diretta/canale5_cC5/",
+    "directUrl": "https://live02-seg.msf.cdn.mediaset.net/live/ch-c5/c5-clr.isml/index.m3u8"
   },
   {
     "id": "italia1",
@@ -53,7 +59,8 @@
     "name": "Italia 1",
     "logo": "italia1-it.png",
     "group": "MEDIASET",
-    "url": "https://mediasetinfinity.mediaset.it/diretta/italia-1_cI1"
+    "url": "https://mediasetinfinity.mediaset.it/diretta/italia-1_cI1",
+    "directUrl": "https://live02-seg.msf.cdn.mediaset.net/live/ch-i1/i1-clr.isml/index.m3u8"
   },
   {
     "id": "tgcom24",
@@ -61,15 +68,17 @@
     "name": "TGCOM24",
     "logo": "tgcom24-it.png",
     "group": "MEDIASET",
-    "url": "https://www.tgcom24.mediaset.it/diretta/canale-51-diretta-streaming_88728925-02l.shtml/"
+    "url": "https://www.tgcom24.mediaset.it/diretta/canale-51-diretta-streaming_88728925-02l.shtml/",
+    "directUrl": "https://d3k8wzt41aflvx.cloudfront.net/TGCOM24/Live.m3u8"
   },
   {
     "id": "la7",
     "number": 7,
-    "name": "La7",
+    "name": "LA7",
     "logo": "la7-it.png",
     "group": "ALTRI",
-    "url": "https://tg.la7.it/dirette-tv"
+    "url": "https://tg.la7.it/dirette-tv",
+    "directUrl": "https://d1chghleocc9sm.cloudfront.net/v1/master/3722c60a815c199d9c0ef36c5b73da68a62b09d1/cc-evfku205gqrtf/Live.m3u8"
   },
   {
     "id": "tv8",
@@ -77,7 +86,8 @@
     "name": "TV8",
     "logo": "tv8-it.png",
     "group": "ALTRI",
-    "url": "https://www.tv8.it/streaming"
+    "url": "https://www.tv8.it/streaming",
+    "directUrl": "https://hlslive-web-gcdn-skycdn-it.akamaized.net/TACT/11223/tv8web/master.m3u8?hdnts=st=1764666351~exp=1829466206~acl=/*~hmac=b0e9165b6c55027903ad103c8219f363d8765eb300c0d9a339e9767fc3509556"
   },
   {
     "id": "nove",
@@ -85,6 +95,7 @@
     "name": "NOVE",
     "logo": "nove-it.png",
     "group": "ALTRI",
-    "url": "https://nove.tv/live-streaming-nove?view=upcoming#nove"
+    "url": "https://nove.tv/live-streaming-nove?view=upcoming#nove",
+    "directUrl": "https://streaming.aurora.enhanced.live/live/mpc/enl0eG1mLmVncmVzcy5mZDJ2eHI=/out/v1/IT_SIMULCAST/NOVE/CMAF/index.m3u8"
   }
 ]

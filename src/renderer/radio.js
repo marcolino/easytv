@@ -8,7 +8,11 @@
   const $=id=>document.getElementById(id);
   $('name').textContent=station.name;
   $('metadata').textContent=[station.country,station.genre,station.codec,station.bitrate?`${station.bitrate} kbps`:'',station.frequency].filter(Boolean).join(' · ');
-  if(station.logo){$('logo').src=/^https?:\/\//i.test(station.logo)?station.logo:`../../assets/icons/${station.logo}`;$('logo').hidden=false;$('logo').onerror=()=>$('logo').hidden=true;}
+  const logo=$('logo'); let logoAttempted=false;
+  async function recoverLogo(){if(logoAttempted)return;logoAttempted=true;try{const url=await api.findStationLogo({name:station.name,country:station.country,logo:station.logo},'radio');if(url)logo.src=url;}catch{}}
+  logo.onload=()=>logo.hidden=false;
+  logo.onerror=()=>{logo.hidden=true;recoverLogo();};
+  if(station.logo)logo.src=/^https?:\/\//i.test(station.logo)?station.logo:`../../assets/icons/${station.logo}`;else recoverLogo();
   let audio, context, analyser, retry, generation=0, wanted=true, cors=true;
   const canvas=$('wave'),ctx=canvas.getContext('2d');
   function draw(){requestAnimationFrame(draw);ctx.clearRect(0,0,canvas.width,canvas.height);if(!analyser||!audio||audio.paused)return;const data=new Uint8Array(analyser.frequencyBinCount);analyser.getByteFrequencyData(data);ctx.fillStyle='#58d68d';for(let i=0;i<100;i++){const h=data[i]/255*canvas.height;ctx.fillRect(i*10,(canvas.height-h)/2,7,h);}}

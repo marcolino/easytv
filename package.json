@@ -7,7 +7,7 @@
     "start": "TVSET=0 TMPDIR=\"$PWD/.tmp\" electron_config_cache=\"$PWD/.electron-cache\" electron --ozone-platform=x11 .",
     "start:tvset": "TVSET=1 TMPDIR=\"$PWD/.tmp\" electron_config_cache=\"$PWD/.electron-cache\" electron --ozone-platform=x11 .",
     "start:wayland": "TMPDIR=\"$PWD/.tmp\" electron_config_cache=\"$PWD/.electron-cache\" electron --ozone-platform=wayland .",
-    "check": "node --check src/main.js && node --check src/preload.js && node --check src/preferences.js && node --check src/i18n.js && node --check src/renderer/app.js && node --check scripts/increment-build.js && node --check scripts/i18n-check.js && node --check scripts/i18n-translate.js && node --check src/radio-browser.js && node --check src/renderer/radio.js && npm run i18n:check",
+    "check": "node --check src/main.js && node --check src/preload.js && node --check src/preferences.js && node --check src/i18n.js && node --check src/renderer/app.js && node --check scripts/increment-build.js && node --check scripts/i18n-check.js && node --check scripts/i18n-translate.js && node --check src/radio-browser.js && node --check src/renderer/radio.js && node --check src/renderer/tv.js && node --check src/tv-catalogue.js && npm run i18n:check",
     "i18n": "npm run i18n:translate && npm run i18n:check",
     "i18n:check": "node scripts/i18n-check.js",
     "i18n:sync": "node scripts/i18n-check.js --sync",
@@ -30,5 +30,8 @@
   },
   "author": "Marco Solari <marcosolari@gmail.com>",
   "homepage": "https://github.com/marcolino/easytv",
-  "desktopName": "EasyTV"
+  "desktopName": "EasyTV",
+  "dependencies": {
+    "hls.js": "^1.6.0"
+  }
 }

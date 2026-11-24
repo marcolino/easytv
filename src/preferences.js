@@ -4,12 +4,13 @@ const path = require('node:path');
 
 function createPreferences(app, tvs, radios) {
   const file = path.join(app.getPath('userData'), 'settings.json');
-  const tvIds = new Set(tvs.map(x => x.id));
+  const tvIds = { has: id => tvs.some(x => x.id === id) };
   const radioIds = { has: id => radios.some(x => x.id === id) };
   const defaults = {
     language: 'auto',
+    tvPlayback: {},
     lastStation: null,
-    favorites: { tv: tvs.map(x => x.id), radio: radios.filter(x => x.favorite === true).map(x => x.id) },
+    favorites: { tv: tvs.filter(x => !x.source).map(x => x.id), radio: radios.filter(x => x.favorite === true).map(x => x.id) },
     groups: [
       { id: 'rai', name: 'RAI', type: 'tv', visible: true, stationIds: tvs.filter(x => x.group === 'RAI').map(x => x.id) },
       { id: 'mediaset', name: 'MEDIASET', type: 'tv', visible: true, stationIds: tvs.filter(x => x.group === 'MEDIASET').map(x => x.id) },
@@ -22,13 +23,14 @@ function createPreferences(app, tvs, radios) {
     const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
     // Accept previously saved lastChannelId from earlier prototypes.
     data.language = raw.language;
+    data.tvPlayback = raw.tvPlayback;
     const last = raw.lastStation ?? (raw.lastChannelId ? { type: 'tv', id: raw.lastChannelId } : null);
     if (last && last.type === 'tv' && tvIds.has(last.id)) data.lastStation = last;
     if (last && last.type === 'radio' && radioIds.has(last.id)) data.lastStation = last;
     if (raw.favorites && Array.isArray(raw.favorites.tv) && Array.isArray(raw.favorites.radio)) {
-      data.favorites = raw.favorites;
+      data.favorites = { ...raw.favorites, tv: raw.favorites.tv.filter(id => !String(id).startsWith('custom-') || tvIds.has(id)) };
     }
-    if (Array.isArray(raw.groups)) data.groups = raw.groups;
+    if (Array.isArray(raw.groups)) data.groups = raw.groups.map(g => g.type === 'tv' && Array.isArray(g.stationIds) ? {...g, stationIds:g.stationIds.filter(id=>!String(id).startsWith('custom-')||tvIds.has(id))}:g);
     // Earlier experimental sections schema, when present.
     else if (Array.isArray(raw.sections)) data.groups = raw.sections.map(s => ({
       id: s.id, name: s.name, type: s.kind, visible: s.visible, stationIds: s.stationIds
@@ -76,7 +78,12 @@ function createPreferences(app, tvs, radios) {
     const last = value.lastStation;
     const validLast = last && ['tv','radio'].includes(last.type) &&
       (last.type === 'tv' ? tvIds : radioIds).has(last.id) ? { type: last.type, id: last.id } : null;
-    return { language: ['auto','en','it','fr','de'].includes(value.language) ? value.language : 'auto', lastStation: validLast, favorites, groups, knownTvIds: [...tvIds] };
+    const tvPlayback = {};
+    for (const station of tvs) {
+      const mode = value.tvPlayback?.[station.id];
+      if (station.directUrl && ['direct','auto'].includes(mode)) tvPlayback[station.id] = mode;
+    }
+    return { tvPlayback, language: ['auto','en','it','fr','de'].includes(value.language) ? value.language : 'auto', lastStation: validLast, favorites, groups, knownTvIds: tvs.map(x => x.id) };
   }
   function write(next) {
     const checked = validate(next);
@@ -90,6 +97,10 @@ function createPreferences(app, tvs, radios) {
   return {
     get: () => structuredClone(data),
     update: next => write({ ...next, lastStation: data.lastStation }),
+    forgetRadio: id => {const next=structuredClone(data);next.favorites.radio=next.favorites.radio.filter(x=>x!==id);for(const g of next.groups)if(g.type==='radio')g.stationIds=g.stationIds.filter(x=>x!==id);if(next.lastStation?.type==='radio'&&next.lastStation.id===id)next.lastStation=null;return write(next);},
+    restoreRadio: (id,before) => {const next=structuredClone(data);const insert=(a,b)=>{const i=b.indexOf(id);if(i>=0&&!a.includes(id))a.splice(Math.min(i,a.length),0,id);};insert(next.favorites.radio,before.favorites.radio);for(const g of next.groups)if(g.type==='radio'){const old=before.groups.find(x=>x.id===g.id);if(old)insert(g.stationIds,old.stationIds);}if(!next.lastStation&&before.lastStation?.type==='radio'&&before.lastStation.id===id)next.lastStation=before.lastStation;return write(next);},
+    forgetTV: id => { const next=structuredClone(data); next.favorites.tv=next.favorites.tv.filter(x=>x!==id); for(const g of next.groups) if(g.type==='tv')g.stationIds=g.stationIds.filter(x=>x!==id); delete next.tvPlayback[id]; if(next.lastStation?.type==='tv'&&next.lastStation.id===id)next.lastStation=null; return write(next); },
+    restoreTV: (id,before) => {const next=structuredClone(data);const insert=(a,b)=>{const i=b.indexOf(id);if(i>=0&&!a.includes(id))a.splice(Math.min(i,a.length),0,id);};insert(next.favorites.tv,before.favorites.tv);for(const g of next.groups){const old=before.groups.find(x=>x.id===g.id);if(old)insert(g.stationIds,old.stationIds);}if(before.tvPlayback[id])next.tvPlayback[id]=before.tvPlayback[id];if(!next.lastStation&&before.lastStation?.id===id)next.lastStation=before.lastStation;return write(next);},
     remember: (type, id) => write({ ...data, lastStation: { type, id } })
   };
 }
