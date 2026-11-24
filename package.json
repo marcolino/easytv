@@ -11,12 +11,13 @@
 
     "check": "node --check src/main.js && node --check src/preload.js && node --check src/preferences.js && node --check src/i18n.js && node --check src/renderer/app.js && node --check scripts/increment-build.js && node --check scripts/i18n-check.js && node --check scripts/i18n-translate.js && npm run i18n:check",
 
+    "i18n": "npm run i18n:translate && npm run i18n:check",
     "i18n:check": "node scripts/i18n-check.js",
     "i18n:sync": "node scripts/i18n-check.js --sync",
     "i18n:translate": "npm run i18n:sync && node scripts/i18n-translate.js",
 
-    "build": "npm run check && npm run build:win && npm run build:linux && echo \"\\n\\nAll builds complete!\"",
-
+    "build": "npm run i18n && npm run check && npm run build:win && npm run build:linux && echo \"\\n\\nAll builds complete!\"",
+    
     "prebuild:win": "node scripts/increment-build.js",
     "build:win": "electron-builder --win nsis --x64",
 
