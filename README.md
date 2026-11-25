@@ -83,7 +83,7 @@ The channel-selection buttons remain clickable and keyboard-accessible. Their lo
 | 5 | Canale 5 | 51 | TGCOM24 |
 | 6 | Italia 1 | | |
 
-Original numbers are defined in `src/tvs.json`; imported and manual TV channels may have a unique optional number. Numbers are independent of the order of the buttons on screen.
+Original numbers are defined in `src/config/tvs.json`; imported and manual TV channels may have a unique optional number. Numbers are independent of the order of the buttons on screen.
 
 ### Keyboard and infrared-remote controls
 
@@ -137,3 +137,33 @@ The latest catalogue and player changes have been exercised on Linux; the earlie
 For installation details, build numbering, build instructions, and development information, see [BUILD.md](BUILD.md).
 
 Project repository: https://github.com/marcolino/easytv
+
+## Development profile
+
+Unpackaged launches use `~/.config/easytv-dev/` on Linux, while installed builds use `~/.config/easytv/`. Each profile has independent preferences, catalogues, logo cache and browser sessions. Existing production preferences are preserved.
+
+### Restore default settings
+
+The button at the bottom of Settings resets only the active profile after confirmation and restarts EasyTV. Custom catalogues, favorites, groups, playback modes, language preferences, last station and logo cache are reset. Browser cookies and DRM data are retained. Previous JSON files are moved to a unique `reset-backup-*` directory inside the active profile. To restore them, close EasyTV and copy the saved JSON files back to that profile, replacing the current files as needed. The other profile and packaged default catalogues are not changed.
+
+## Playback controls and translation overrides
+
+OFF / F10 exits EasyTV; kiosk shutdown is managed externally. Backspace recalls the previous station when no numeric entry is pending. Numeric entry shows an on-screen display where the playback surface permits it.
+
+Approved translations belong in `src/locales/translation-overrides.json`. Run `npm run i18n:sync` to apply them without network requests. Builds do not translate automatically.
+
+## Settings and numeric selection
+
+TV and radio share optional unique numeric shortcuts (0–9999). Assign radio numbers in the station editor, for example 105 for Radio 105. Enter confirms immediately; otherwise selection follows the 1.5-second timeout (or four digits). The language selector lists the four supported languages; initial language detection remains automatic.
+
+Use `npm run i18n:sort` to sort translation keys without changing values. Synchronization, pruning and translation also write sorted dictionaries.
+
+## Interface typography
+
+EasyTV uses locally installed Open Sans font assets for its own interface, with system-font fallbacks. The channel-name banner retains its distinct rounded typography. Broadcaster websites control their own fonts.
+
+### Manual TV channels
+
+Provide a name and at least one URL: a direct stream or an HTTPS official player page. Both URLs enable automatic fallback. Original stations can be previewed; their edit and delete controls explain why those operations are unavailable. Remove original stations from favorites instead.
+
+For interactive web services, F10 returns to EasyTV Home; a separate second press exits EasyTV. Groups can be expanded individually and reordered using their drag handles.

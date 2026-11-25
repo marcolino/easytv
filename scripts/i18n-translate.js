@@ -46,7 +46,7 @@ function readJSON(file) {
 
 function writeJSON(file, data) {
   const temporary = file + '.tmp';
-  fs.writeFileSync(temporary, JSON.stringify(data, null, 2) + '\n', 'utf8');
+  fs.writeFileSync(temporary, JSON.stringify(Object.fromEntries(Object.keys(data).sort().map(key => [key, data[key]])), null, 2) + '\n', 'utf8');
   fs.renameSync(temporary, file);
 }
 
@@ -181,6 +181,15 @@ async function translateDictionary(language, english) {
       ? englishValue
       : removeContext(key);
     const current = dictionary[key];
+    const overrides = require('../src/locales/translation-overrides.json');
+    if (Object.hasOwn(overrides[language] || {}, key)) {
+      if (!dryRun && current !== overrides[language][key]) {
+        dictionary[key] = overrides[language][key];
+        writeJSON(file, dictionary);
+      }
+      skipped++;
+      continue;
+    }
     // Preserve existing non-English translations.
     if (typeof current === 'string' &&
       current.trim() &&
@@ -232,7 +241,7 @@ async function main() {
   let languages = fs.readdirSync(LOCALES_DIR)
     .filter(file => file.endsWith('.json'))
     .map(file => path.basename(file, '.json'))
-    .filter(language => language !== 'en')
+    .filter(language => language !== 'en' && language !== 'translation-overrides')
     .sort();
   if (requestedLanguage) {
     if (!languages.includes(requestedLanguage)) {

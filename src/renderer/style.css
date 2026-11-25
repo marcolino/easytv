@@ -1,3 +1,7 @@
+@import url("../../node_modules/@fontsource/open-sans/400.css");
+@import url("../../node_modules/@fontsource/open-sans/600.css");
+@import url("../../node_modules/@fontsource/open-sans/700.css");
+
 * {
   box-sizing: border-box;
 }
@@ -11,7 +15,7 @@ html, body {
 }
 body {
   margin: 0;
-  font-family: Arial, sans-serif;
+  font-family: "Open Sans", system-ui, sans-serif;
   background: #151922;
   color: #fff;
   display: flex;
@@ -138,7 +142,7 @@ header p {
   border-radius: 3px;
   background: #303948;
   color: #aab2c0;
-  font: normal 9px/1 Arial, sans-serif;
+  font: normal 9px/1 "Open Sans", system-ui, sans-serif;
 }
 #settings-page {
   max-height: 490px;
@@ -606,23 +610,254 @@ button:focus-visible, input:focus-visible {
   align-items: center;
   gap: 12px;
   margin-top: 5px;
-  min-height: 96px;
+  min-height: 26px;
 }
 .manual-logo-image,.manual-logo-fallback {
-  width: 96px;
-  height: 96px;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
   object-fit: contain;
   background: rgba(255,255,255,.06);
   border-radius: 6px;
   box-sizing: border-box;
-  padding: 8px;
+  padding: 2px;
 }
 .manual-logo-fallback {
   display: grid;
   place-items: center;
-  font-size: 36px;
+  font-size: 16px;
 }
 .manual-logo-status {
   font-size: 12px;
   opacity: .85;
+}
+
+.reset-profile-section {
+  border-top: 1px solid #303641;
+  margin-top: 24px;
+  padding: 16px 0;
+  display: flex;
+  justify-content: flex-end;
+}
+
+#reset-profile {
+  background: #79343c;
+  color: white;
+}
+
+#reset-profile:hover {
+  background: #93434e;
+}
+
+.catalogue-tools {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 8px;
+  margin-top: 12px;
+}
+.catalogue-tools > .catalogue-panel {
+  display: contents;
+}
+.catalogue-tools > .catalogue-panel > .accordion-toggle {
+  grid-row: 1;
+  grid-column: 1;
+  cursor: pointer;
+}
+.catalogue-tools > .catalogue-panel[id^="manual-"] > .accordion-toggle {
+  grid-column: 2;
+  padding: 4px 12px;
+}
+.catalogue-tools > .catalogue-panel > .accordion-content {
+  grid-column: 1 / -1;
+  grid-row: 2;
+}
+.catalogue-tools > .catalogue-panel > .accordion-content[hidden] {
+  display: none;
+}
+#settings-page #manual-save, #settings-page #manual-radio-save {
+  background: #276749;
+}
+#settings-page #manual-save:hover, #settings-page #manual-radio-save:hover {
+  background: #35845d;
+}
+.language-row label, #groups-panel > summary {
+  color: #929bad;
+  font-size: 14px;
+  letter-spacing: 1px;
+  font-weight: 700;
+}
+.section-separator {
+  border: 0;
+  border-top: 1px solid #414958;
+  margin: 20px 0;
+}
+
+.catalogue-tools .accordion-toggle::before { content: "▸"; margin-right: 8px; }
+.catalogue-tools .accordion-toggle[aria-expanded="true"]::before { content: "▾"; }
+
+/* Compact catalogue controls and aligned manual forms. */
+.catalogue-tools {
+  grid-template-columns: max-content max-content minmax(0, 1fr);
+  column-gap: 10px;
+}
+.catalogue-tools > .catalogue-panel > .accordion-toggle {
+  justify-self: start;
+  align-self: center;
+}
+.manual-tv-fields input,
+#settings-page .logo-input-row button {
+  box-sizing: border-box;
+  height: 32px;
+  font: inherit;
+}
+.manual-tv-fields input {
+  padding: 4px 6px;
+}
+#settings-page .logo-input-row button {
+  padding: 4px 10px;
+}
+#settings-page #manual-preview,
+#settings-page #manual-save,
+#settings-page #manual-clear,
+#settings-page #manual-radio-preview,
+#settings-page #manual-radio-save,
+#settings-page #manual-radio-clear {
+  box-sizing: border-box;
+  height: 32px;
+  vertical-align: middle;
+  margin-bottom: 0;
+}
+#settings-message, .undo-toast {
+  font-size: 22px;
+  max-width: min(680px, 90vw);
+}
+.undo-toast button, #toast-close {
+  font-size: 18px;
+}
+
+button, input, select, textarea {
+  font-family: inherit;
+}
+
+/* Section descriptions sit directly below their headings. */
+#settings-page h3:has(+ .settings-description) {
+  margin-bottom: 4px;
+}
+#settings-page h3 + .settings-description {
+  margin: 0 0 12px;
+  font-size: 11px;
+  line-height: 1.5;
+}
+header #subtitle {
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+#settings-page .tv-icon.protected-action {
+  opacity: .45;
+  cursor: help;
+}
+.manual-tv-url-hint {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: .85em;
+  color: #aab2c0;
+}
+
+/* Slightly tighter Open Sans typography. */
+body, button, input, select, textarea {
+  letter-spacing: normal;
+}
+
+/* Compact catalogue actions, aligned along the bottom edge. */
+#settings-page .catalogue .tv-icon {
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  align-self: flex-end;
+  margin: 0;
+}
+#settings-page .catalogue .tv-icon svg {
+  width: 14px;
+  height: 14px;
+}
+#settings-page .catalogue .tv-playback-mode {
+  height: 26px;
+  padding: 0 4px;
+  align-self: flex-end;
+  margin-bottom: 0;
+}
+.channel-number, .catalogue .channel-number {
+  left: 6px;
+  right: auto;
+}
+
+/* Settings section typography and single-mode selectors. */
+#settings-page h3, .language-row label, #groups-panel > summary {
+  letter-spacing: normal;
+}
+#settings-page .catalogue .tv-playback-mode:disabled {
+  opacity: .65;
+}
+
+/* Keep catalogue controls on the same baseline as the station name. */
+.status { letter-spacing: normal; }
+#settings-page .catalogue .tv-icon,
+#settings-page .catalogue .tv-playback-mode {
+  align-self: center;
+}
+
+/* Compact group accordions and more legible Home status. */
+.status { font-size: 16px; }
+.group-accordion-header { display: flex; align-items: center; gap: 8px; }
+.group-accordion-toggle { flex: 1; text-align: left; }
+.group-accordion-toggle::after { content: '▸'; float: right; }
+.group-accordion-toggle[aria-expanded="true"]::after { content: '▾'; }
+.group-accordion-body:not([hidden]) { margin-top: 12px; }
+.group-accordion-body[hidden] { display: none; }
+
+/* Group insertion marker. */
+.group-editor { position: relative; }
+.group-drop-before::before, .group-drop-after::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: #58d68d;
+  border-radius: 3px;
+  pointer-events: none;
+  z-index: 2;
+}
+.group-drop-before::before { top: -3px; }
+.group-drop-after::after { bottom: -3px; }
+
+/* Keep the TV logo preview beside the official player URL. */
+.manual-logo-cell {
+  display: flex;
+  align-items: flex-end;
+  min-width: 0;
+}
+.manual-logo-cell .manual-logo-preview:not([hidden]) {
+  margin-top: 0;
+  min-height: 32px;
+}
+
+/* Home tiles: number keycaps sit behind the station logo. */
+.channel {
+  isolation: isolate;
+}
+.channel > .channel-number {
+  z-index: 0;
+}
+.channel > .channel-logo {
+  position: relative;
+  z-index: 1;
+}
+
+/* Keep the original centred layout; paint station names above number keycaps. */
+.channel > .channel-name {
+  position: relative;
+  z-index: 1;
 }

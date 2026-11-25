@@ -1,3 +1,7 @@
+@import url("../../node_modules/@fontsource/open-sans/400.css");
+@import url("../../node_modules/@fontsource/open-sans/600.css");
+@import url("../../node_modules/@fontsource/open-sans/700.css");
+
 * {
   box-sizing: border-box;
 }
@@ -5,7 +9,7 @@ body {
   margin: 0;
   background: #151922;
   color: #fff;
-  font: 18px Arial,sans-serif;
+  font: 18px "Open Sans", system-ui, sans-serif;
 }
 header {
   display: flex;
@@ -54,4 +58,13 @@ button:focus-visible {
 }
 #play {
   color: #58d68d;
+}
+
+button, input, select, textarea {
+  font-family: inherit;
+}
+
+/* Slightly tighter Open Sans typography. */
+body, button, input, select, textarea {
+  letter-spacing: normal;
 }

@@ -13,8 +13,9 @@ function createPreferences(app, tvs, radios) {
     favorites: { tv: tvs.filter(x => !x.source).map(x => x.id), radio: radios.filter(x => x.favorite === true).map(x => x.id) },
     groups: [
       { id: 'rai', name: 'RAI', type: 'tv', visible: true, stationIds: tvs.filter(x => x.group === 'RAI').map(x => x.id) },
-      { id: 'mediaset', name: 'MEDIASET', type: 'tv', visible: true, stationIds: tvs.filter(x => x.group === 'MEDIASET').map(x => x.id) },
-      { id: 'altri', name: 'ALTRI CANALI', type: 'tv', visible: true, stationIds: tvs.filter(x => x.group === 'ALTRI').map(x => x.id) }
+      { id: 'mediaset', name: 'Mediaset', type: 'tv', visible: true, stationIds: tvs.filter(x => x.group === 'MEDIASET').map(x => x.id) },
+      { id: 'streaming', name: 'Streaming', type: 'tv', visible: true, stationIds: tvs.filter(x => x.service).map(x => x.id) },
+      { id: 'altri', name: 'Altri canali', type: 'tv', visible: true, stationIds: tvs.filter(x => x.group === 'ALTRI').map(x => x.id) }
     ]
   };
   for (const name of new Set(radios.map(r => r.group || 'Radio')))
@@ -44,6 +45,18 @@ function createPreferences(app, tvs, radios) {
     const known = new Set(Array.isArray(raw.knownTvIds) ? raw.knownTvIds : [
       ...data.favorites.tv, ...data.groups.filter(g => g.type === 'tv').flatMap(g => g.stationIds)
     ]);
+    const newServices = tvs.filter(x => x.service && !known.has(x.id));
+    if (newServices.length) {
+      let group = data.groups.find(g => g.id === 'streaming' && g.type === 'tv');
+      if (!group) {
+        group = { id: 'streaming', name: 'Streaming', type: 'tv', visible: true, stationIds: [] };
+        data.groups.push(group);
+      }
+      for (const station of newServices) {
+        if (!group.stationIds.includes(station.id)) group.stationIds.push(station.id);
+        if (!data.favorites.tv.includes(station.id)) data.favorites.tv.push(station.id);
+      }
+    }
     for (const station of tvs) {
       if (known.has(station.id))
         continue;
@@ -51,6 +64,13 @@ function createPreferences(app, tvs, radios) {
       const target = defaultGroup && data.groups.find(g => g.id === defaultGroup.id && g.type === 'tv');
       if (target && !target.stationIds.includes(station.id))
         target.stationIds.push(station.id);
+    }
+    // Rename only unchanged legacy default group names.
+    const legacyNames = { mediaset: 'MEDIASET', streaming: 'STREAMING', altri: 'ALTRI CANALI' };
+    for (const group of data.groups) {
+      const original = defaults.groups.find(g => g.id === group.id);
+      if (original && group.type === 'tv' && group.name === legacyNames[group.id])
+        group.name = original.name;
     }
     data = validate(data);
   }

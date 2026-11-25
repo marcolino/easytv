@@ -120,15 +120,15 @@ function applyLanguage() {
   document.getElementById('subtitle').textContent = editing ? t('Settings') : t('Choose a channel to watch');
   gear.title = t('Settings') + ' (F2)';
   gear.setAttribute('aria-label', gear.title);
-  power.title = t(appInfo.tvset ? 'Shut down the device' : 'Exit EasyTV') + ' (F10)';
+  power.title = t('Exit EasyTV') + ' (F10)';
   power.setAttribute('aria-label', power.title);
   languageSelect.replaceChildren();
-  for (const [code, label] of [['auto', t('Automatic') + ' (' + localeData.languages[localeData.systemLanguage] + ')'], ...Object.entries(localeData.languages)]) {
+  for (const [code, label] of Object.entries(localeData.languages)) {
     const option = element('option', '', label);
     option.value = code;
     languageSelect.append(option);
   }
-  languageSelect.value = preference;
+  languageSelect.value = preference === 'auto' ? localeData.systemLanguage : preference;
   window.easyTV.previewLanguage(editing ? preference : null);
   if (editing) {
     renderCatalogue('tv', tvs);
@@ -229,8 +229,14 @@ function radioLogo(station, className, kind = 'radio') {
 }
 
 function radioButton(station) {
-  const b = button(station.name, () => window.easyTV.openRadio(station.id), 'channel');
-  b.prepend(radioLogo(station, 'channel-logo'));
+  const b = button('', () => window.easyTV.openRadio(station.id), 'channel');
+  b.title = station.number == null ? station.name : t('{name} — channel {number}', { name: station.name, number: station.number });
+  b.setAttribute('aria-label', b.title);
+  b.append(radioLogo(station, 'channel-logo'), element('span', 'channel-name', station.name));
+  const keys = element('span', 'channel-number');
+  for (const digit of String(station.number ?? ''))
+    keys.append(element('kbd', 'channel-key', digit));
+  b.append(keys);
   return b;
 }
 let radioOffset = 0, radioQuery = {}, radioResults = [], radioMore = false;
@@ -486,24 +492,21 @@ function renderCatalogue(type, catalogue) {
       item.append(handle);
     }
     item.append(star, element('span', 'catalogue-name', station.name));
-    if (station.number != null) {
-      item.classList.add('numbered');
-      const keys = element('span', 'channel-number');
-      for (const digit of String(station.number))
-        keys.append(element('kbd', 'channel-key', digit));
-      item.append(keys);
-    }
-    if (type === 'tv' && station.directUrl && station.url) {
+    if (type === 'tv') {
       const select = element('select', 'tv-playback-mode');
       select.setAttribute('aria-label', t('Playback mode') + ': ' + station.name);
       for (const [value, label, description] of [['web', t('Web'), t('Official player')], ['direct', t('Direct'), t('Direct streaming')], ['auto', t('Auto'), t('Automatic fallback')]]) {
+        if ((value === 'web' && !station.url) || (value === 'direct' && !station.directUrl) || (value === 'auto' && !(station.url && station.directUrl)))
+          continue;
         const option = element('option', '', label);
         option.value = value;
         option.title = description;
         select.append(option);
       }
-      select.value = draft.tvPlayback?.[station.id] || 'web';
-      select.title = select.selectedOptions[0].title;
+      const preferred = draft.tvPlayback?.[station.id] || 'web';
+      select.value = [...select.options].some(option => option.value === preferred) ? preferred : select.options[0]?.value || '';
+      select.disabled = select.options.length <= 1;
+      select.title = select.selectedOptions[0]?.title || t('Playback mode');
       select.onchange = () => {
         select.title = select.selectedOptions[0].title;
         draft.tvPlayback ||= {};
@@ -515,11 +518,22 @@ function renderCatalogue(type, catalogue) {
       };
       item.append(select);
     }
-    if (type === 'tv' && station.source) {
-      item.append(tvIconButton('play', t('Watch'), () => window.easyTV.previewTV(station.id)), tvIconButton('edit', t('Edit channel'), () => editTV(station)), tvIconButton('trash', t('Delete channel'), () => deleteTV(station), true));
+    if (type === 'tv') {
+      const protectedReason = t('Original stations cannot be edited or deleted. You can remove them from favorites.');
+      item.append(
+        tvIconButton('play', t('Watch'), () => window.easyTV.previewTV(station.id)),
+        tvIconButton('edit', t('Edit channel'), () => editTV(station), false, station.source || station.service ? '' : protectedReason),
+        tvIconButton('trash', t('Delete channel'), () => deleteTV(station), true, station.source ? '' : protectedReason)
+      );
     }
-    if (type === 'radio' && station.editable)
-      item.append(tvIconButton('play', t('Preview'), () => window.easyTV.openRadio(station.id, true)), tvIconButton('edit', t('Edit station'), () => editRadio(station)), tvIconButton('trash', t('Delete station'), () => deleteRadio(station), true));
+    if (type === 'radio') {
+      const protectedReason = t('Original stations cannot be edited or deleted. You can remove them from favorites.');
+      item.append(
+        tvIconButton('play', t('Preview'), () => window.easyTV.openRadio(station.id, true)),
+        tvIconButton('edit', t('Edit station'), () => editRadio(station), false, station.editable ? '' : protectedReason),
+        tvIconButton('trash', t('Delete station'), () => deleteRadio(station), true, station.editable ? '' : protectedReason)
+      );
+    }
     holder.append(item);
   }
 }
@@ -541,11 +555,72 @@ function updateToolbar() {
   tooltip(back, back.textContent);
 }
 
+let openGroupId = null;
+
 function renderGroups(focusIndex = -1) {
+  if (focusIndex >= 0) openGroupId = draft.groups[focusIndex]?.id || null;
   groupEditor.replaceChildren();
   draft.groups.forEach((group, index) => {
     const baseline = groupSnapshots.get(group.id);
     const card = element('section', 'group-editor');
+    const header = element('div', 'group-accordion-header');
+    const handle = button('☰', () => {}, 'drag-handle');
+    tooltip(handle, t('Move up') + ' / ' + t('Move down') + ' (Alt+Up/Down)');
+    handle.draggable = true;
+    const toggle = button(group.name, () => { card.open = !card.open; }, 'group-accordion-toggle');
+    const body = element('div', 'group-accordion-body');
+    Object.defineProperty(card, 'open', {
+      get: () => !body.hidden,
+      set(value) {
+        body.hidden = !value;
+        toggle.setAttribute('aria-expanded', String(!!value));
+        if (value) {
+          openGroupId = group.id;
+          closeOtherAccordions(groupsPanel);
+          for (const other of groupEditor.children)
+            if (other !== card) other.open = false;
+        }
+        else if (openGroupId === group.id) openGroupId = null;
+      }
+    });
+    body.hidden = openGroupId !== group.id;
+    toggle.setAttribute('aria-expanded', String(!body.hidden));
+    header.append(handle, toggle);
+    const mime = 'application/x-easytv-group';
+    const clearMarks = () => groupEditor.querySelectorAll('.group-drop-before, .group-drop-after').forEach(el => el.classList.remove('group-drop-before', 'group-drop-after'));
+    const after = e => e.clientY > header.getBoundingClientRect().top + header.getBoundingClientRect().height / 2;
+    handle.addEventListener('dragstart', e => {
+      e.dataTransfer.setData(mime, group.id);
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    handle.addEventListener('dragend', clearMarks);
+    card.addEventListener('dragover', e => {
+      if (!e.dataTransfer.types.includes(mime)) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      clearMarks();
+      card.classList.add(after(e) ? 'group-drop-after' : 'group-drop-before');
+    });
+    card.addEventListener('dragleave', e => {
+      if (!card.contains(e.relatedTarget)) clearMarks();
+    });
+    card.addEventListener('drop', e => {
+      if (!e.dataTransfer.types.includes(mime)) return;
+      e.preventDefault();
+      clearMarks();
+      const from = draft.groups.findIndex(g => g.id === e.dataTransfer.getData(mime));
+      if (from < 0 || from === index) return;
+      const target = index + (after(e) ? 1 : 0) - (from < index ? 1 : 0);
+      const [moved] = draft.groups.splice(from, 1);
+      draft.groups.splice(target, 0, moved);
+      renderGroups();
+    });
+    handle.addEventListener('keydown', e => {
+      if (e.altKey && ['ArrowUp', 'ArrowDown'].includes(e.key)) {
+        e.preventDefault();
+        move(e.key === 'ArrowUp' ? -1 : 1);
+      }
+    });
     const top = element('div', 'group-editor-top');
     const name = element('input', 'group-name');
     name.type = 'text';
@@ -554,6 +629,7 @@ function renderGroups(focusIndex = -1) {
     name.setAttribute('aria-label', t('Group name'));
     name.addEventListener('input', () => {
       group.name = name.value;
+      toggle.textContent = group.name;
       updateActions();
     });
     const kind = element('span', 'group-type', t(group.type === 'tv' ? 'TV' : 'Radio').toUpperCase());
@@ -574,7 +650,7 @@ function renderGroups(focusIndex = -1) {
       if (other < 0 || other >= draft.groups.length)
         return;
       [draft.groups[index], draft.groups[other]] = [draft.groups[other], draft.groups[index]];
-      renderGroups(other);
+      renderGroups();
     };
     const up = button('↑', () => move(-1));
     tooltip(up, t('Move up'));
@@ -597,14 +673,16 @@ function renderGroups(focusIndex = -1) {
       });
       groupSnapshots.delete(group.id);
       draft.groups.splice(index, 1);
-      renderGroups(Math.min(index, draft.groups.length - 1));
+      openGroupId = null;
+      renderGroups();
     }, 'delete-group'));
     const localCancel = button(t('Cancel'), () => {
       if (baseline)
         draft.groups[index] = structuredClone(baseline);
       else
         draft.groups.splice(index, 1);
-      renderGroups(Math.min(index, draft.groups.length - 1));
+      openGroupId = null;
+      renderGroups();
     });
     const localSave = button(t('Save'), async () => {
       if (saving)
@@ -665,7 +743,8 @@ function renderGroups(focusIndex = -1) {
           draft.groups[index] = structuredClone(persistedGroup);
         }
         message.textContent = t('Group saved.');
-        renderGroups(index);
+        openGroupId = null;
+        renderGroups();
         renderHome();
         updateToolbar();
       }
@@ -718,7 +797,8 @@ function renderGroups(focusIndex = -1) {
     }
     if (!catalogue.length)
       members.append(element('span', 'settings-description', t('No stations found.')));
-    card.append(top, controls, members);
+    body.append(top, controls, members);
+    card.append(header, body);
     groupEditor.append(card);
   });
   updateToolbar();
@@ -790,6 +870,8 @@ async function saveSettings() {
   back.disabled = true;
   try {
     saved = await window.easyTV.savePreferences(draft);
+    radios = await window.easyTV.getRadios();
+    tvs = await window.easyTV.getChannels();
     saving = false;
     closeSettings();
   }
@@ -829,6 +911,7 @@ async function initialize() {
   ]);
   tvs = channels;
   radios = await window.easyTV.getRadios();
+  suggestRadioNumber();
   document.getElementById('radio-clear').addEventListener('click', clearRadioSearch);
   document.getElementById('radio-search').addEventListener('click', () => searchRadio());
   document.getElementById('radio-more').addEventListener('click', () => searchRadio(true));
@@ -844,7 +927,7 @@ async function initialize() {
   appInfo = info;
   languageSelect.addEventListener('change', () => {
     if (saving) {
-      languageSelect.value = draft.language;
+      languageSelect.value = draft.language === 'auto' ? localeData.systemLanguage : draft.language;
       return;
     }
     draft.language = languageSelect.value;
@@ -859,12 +942,25 @@ async function initialize() {
   document.getElementById('add-tv-group').addEventListener('click', () => addGroup('tv'));
   document.getElementById('add-radio-group').addEventListener('click', () => addGroup('radio'));
   save.addEventListener('click', saveSettings);
+  const reset = document.getElementById('reset-profile');
+  reset.addEventListener('click', async () => {
+    if (saving)
+      return;
+    reset.disabled = true;
+    try {
+      await window.easyTV.resetProfile();
+    }
+    catch (error) {
+      notify(t('Error: {message}', { message: error.message }), 'error');
+    }
+    finally {
+      reset.disabled = false;
+    }
+  });
   power.addEventListener('click', async () => {
     power.disabled = true;
     try {
-      const result = await window.easyTV.requestPowerOff();
-      if (result?.action === 'unsupported')
-        window.alert(result.message);
+      await window.easyTV.requestPowerOff();
     }
     catch (error) {
       window.alert(t('Error: {message}', { message: error.message }));
@@ -1007,8 +1103,11 @@ const manualFields = ['name', 'directUrl', 'number', 'logo', 'url'];
 
 function editTV(c = null) {
   manualId = c?.id || null;
-  for (const k of manualFields)
-    tvEl('manual-' + k).value = c?.[k] ?? '';
+  for (const k of manualFields) {
+    const field = tvEl('manual-' + k);
+    field.value = c?.[k] ?? '';
+    field.readOnly = Boolean(c?.service && !c.source && k !== 'number');
+  }
   tvEl('manual-status').textContent = '';
   updateLogoPreview('tv');
   if (c) {
@@ -1017,10 +1116,14 @@ function editTV(c = null) {
   }
 }
 
-function tvIconButton(symbol, label, action, remove = false) {
-  const b = button('', action, 'tv-icon' + (remove ? ' tv-delete' : ''));
+function tvIconButton(symbol, label, action, remove = false, reason = '') {
+  const b = button('', reason ? () => notify(reason, 'info') : action, 'tv-icon' + (remove ? ' tv-delete' : ''));
+  if (reason) {
+    b.classList.add('protected-action');
+    b.setAttribute('aria-disabled', 'true');
+  }
   icon(b, symbol);
-  return tooltip(b, label);
+  return tooltip(b, reason ? label + ' — ' + reason : label);
 }
 
 async function deleteTV(c) {
@@ -1116,11 +1219,18 @@ function setupTV() {
     tvEl('tv-search').disabled = tvEl('tv-more').disabled = false;
     renderTVResults();
   };
-  tvEl('manual-clear').onclick = () => editTV();
+  tvEl('manual-clear').onclick = () => {
+    editTV();
+    tvEl('manual-tv-panel').open = false;
+  };
   tvEl('manual-preview').onclick = async () => {
     const d = draft;
     try {
       const input = Object.fromEntries(manualFields.map(k => [k, tvEl('manual-' + k).value.trim()]));
+      if (!input.directUrl && !input.url) {
+        notify(t('At least one TV URL is required'), 'warning');
+        return;
+      }
       const c = upsertTV(await window.easyTV.saveTV(input, manualId));
       if (draft !== d)
         return;
@@ -1137,6 +1247,10 @@ function setupTV() {
     try {
       const input = Object.fromEntries(manualFields.map(k => [k, tvEl('manual-' + k).value.trim()]));
       const wasEdit = !!manualId;
+      if (!input.directUrl && !input.url) {
+        notify(t('At least one TV URL is required'), 'warning');
+        return;
+      }
       const c = upsertTV(await window.easyTV.saveTV(input, manualId));
       if (draft !== d)
         return;
@@ -1144,6 +1258,7 @@ function setupTV() {
       if (!wasEdit)
         favoriteTV(c);
       refreshTV();
+      renderHome();
       tvEl('manual-tv-panel').open = false;
       message.textContent = t('Channel saved.');
     }
@@ -1153,9 +1268,18 @@ function setupTV() {
   };
 }
 let manualRadioId = null;
-const manualRadioFields = ['name', 'url', 'logo', 'country', 'genre', 'frequency', 'homepage'];
+const manualRadioFields = ['name', 'url', 'number', 'logo', 'country', 'genre', 'frequency', 'homepage'];
+
+function suggestRadioNumber() {
+  const used = new Set([...tvs, ...radios].filter(s => s.number != null && s.number !== '').map(s => Number(s.number)));
+  let number = 101;
+  while (number <= 9999 && used.has(number))
+    number++;
+  tvEl('manual-radio-number').placeholder = number <= 9999 ? String(number) : '';
+}
 
 function editRadio(station = null) {
+  suggestRadioNumber();
   manualRadioId = station?.id || null;
   for (const k of manualRadioFields)
     tvEl('manual-radio-' + k).value = station?.[k] ?? '';
@@ -1196,7 +1320,10 @@ function favoriteRadio(s) {
 }
 
 function setupManualRadio() {
-  tvEl('manual-radio-clear').onclick = () => editRadio();
+  tvEl('manual-radio-clear').onclick = () => {
+    editRadio();
+    tvEl('manual-radio-panel').open = false;
+  };
   for (const preview of [true, false])
     tvEl(preview ? 'manual-radio-preview' : 'manual-radio-save').onclick = async () => {
       if (!editing || saving)
@@ -1351,3 +1478,42 @@ function setupLogoSearch() {
   }
 }
 initialize().catch(error => console.error('EasyTV initialization:', error));
+
+const accordionPanels = ['tv-search-panel', 'manual-tv-panel', 'radio-search-panel', 'manual-radio-panel', 'groups-panel'].map(id => document.getElementById(id));
+
+function closeOtherAccordions(active) {
+  if (active !== groupsPanel)
+    for (const card of groupEditor.children) card.open = false;
+  for (const panel of accordionPanels)
+    if (panel !== active && panel.open)
+      panel.open = false;
+}
+
+for (const kind of ['tv', 'radio']) {
+  const search = document.getElementById(`${kind}-search-panel`);
+  const manual = document.getElementById(`manual-${kind}-panel`);
+  for (const panel of [search, manual]) {
+    const toggle = panel.querySelector('.accordion-toggle');
+    const content = panel.querySelector('.accordion-content');
+    content.hidden = true;
+    Object.defineProperty(panel, 'open', {
+      get: () => !content.hidden,
+      set(value) {
+        content.hidden = !value;
+        toggle.setAttribute('aria-expanded', String(!!value));
+        if (value) {
+          closeOtherAccordions(panel);
+          if (panel.id === "manual-radio-panel")
+            suggestRadioNumber();
+        }
+      }
+    });
+    toggle.onclick = () => { panel.open = !panel.open; };
+  }
+}
+
+const groupsPanel = document.getElementById("groups-panel");
+groupsPanel.addEventListener("toggle", () => {
+  if (groupsPanel.open)
+    closeOtherAccordions(groupsPanel);
+});

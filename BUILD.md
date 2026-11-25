@@ -86,7 +86,6 @@ The following commands are defined in the current `package.json`.
 | `npm start` | Development launch using XWayland | No |
 | `npm run start:wayland` | Development launch using native Wayland | No |
 | `npm run check` | JavaScript syntax and translation checks | No |
-| `npm run start:tvset` | Linux TV appliance mode (shutdown after confirmation) | No |
 | `npm run i18n:sync` | Add missing translation keys | No |
 | `npm run i18n:check` | Validate translations | No |
 | `npm run i18n:prune -- --dry-run` | Preview unused keys | No |
@@ -106,7 +105,7 @@ With this naming scheme, npm runs `prebuild:win`, `prebuild:linux`, or `prepack:
 ### Build number and version
 
 - The semantic application version is in `package.json` (currently `1.0.0`).
-- The package build counter is in `src/build-info.json` (the `build` field).
+- The package build counter is in `src/config/build-info.json` (the `build` field).
 - `scripts/increment-build.js` increments the counter **before** a packaging command starts.
 - Development launches and syntax checks do not increment it.
 - A failed build still consumes a build number; this is expected with pre-build hooks.
@@ -122,7 +121,7 @@ Use two spaces for indentation (no tabs) and a blank line between function decla
 
 Translation dictionaries are in `src/locales/` (en, it, fr, de). Review the dry-run output before pruning: the static scanner may miss dynamically constructed keys. Do not automatically prune during packaging.
 
-Original stations are in `src/tvs.json` and `src/radios.json`. The main process manages persistent user catalogues, preferences and logo lookup. Renderer files contain the Home/settings interface and separate TV and radio players. Keep broadcaster-specific web-player code intact when changing direct playback.
+Original stations are in `src/config/tvs.json` and `src/config/radios.json`. The main process manages persistent user catalogues, preferences and logo lookup. Renderer files contain the Home/settings interface and separate TV and radio players. Keep broadcaster-specific web-player code intact when changing direct playback.
 
 ## Build configuration
 
@@ -287,3 +286,39 @@ Before publishing a production release:
 - Verify that all required assets, logos, icons, and build metadata are included.
 - Keep Electron and Castlabs versions consistent across builds.
 - Decide how the shared build counter is managed in CI and source control.
+
+## Development and production profiles
+
+Unpackaged Electron launches use `easytv-dev` under the OS application-data directory. Packaged launches retain the standard `easytv` profile. Close all instances before moving or backing up profiles. No automatic migration is performed.
+
+Run `npm run i18n` explicitly when translations need updating. `npm run build` validates dictionaries but does not call MyMemory or rewrite translations.
+
+### Restore default settings
+
+The button at the bottom of Settings resets only the active profile after confirmation and restarts EasyTV. Custom catalogues, favorites, groups, playback modes, language preferences, last station and logo cache are reset. Browser cookies and DRM data are retained. Previous JSON files are moved to a unique `reset-backup-*` directory inside the active profile. To restore them, close EasyTV and copy the saved JSON files back to that profile, replacing the current files as needed. The other profile and packaged default catalogues are not changed.
+
+## Playback controls and translation overrides
+
+OFF / F10 exits EasyTV; kiosk shutdown is managed externally. Backspace recalls the previous station when no numeric entry is pending. Numeric entry shows an on-screen display where the playback surface permits it.
+
+Approved translations belong in `src/locales/translation-overrides.json`. Run `npm run i18n:sync` to apply them without network requests. Builds do not translate automatically.
+
+## Settings and numeric selection
+
+TV and radio share optional unique numeric shortcuts (0–9999). Assign radio numbers in the station editor, for example 105 for Radio 105. Enter confirms immediately; otherwise selection follows the 1.5-second timeout (or four digits). The language selector lists the four supported languages; initial language detection remains automatic.
+
+Use `npm run i18n:sort` to sort translation keys without changing values. Synchronization, pruning and translation also write sorted dictionaries.
+
+## Interface typography
+
+Open Sans is supplied by the production dependency `@fontsource/open-sans`. Run `npm install` after updating the dependency list. The renderer loads the font locally; no external font service is required. Verify the font assets are included in packaged builds. The channel-name banner retains its separate font stack.
+
+### Manual TV channels
+
+Provide a name and at least one URL: a direct stream or an HTTPS official player page. Both URLs enable automatic fallback. Original stations can be previewed; their edit and delete controls explain why those operations are unavailable. Remove original stations from favorites instead.
+
+For interactive web services, F10 returns to EasyTV Home; a separate second press exits EasyTV. Groups can be expanded individually and reordered using their drag handles.
+
+## Source configuration layout
+
+Default TV, radio and service catalogues and the build counter live in `src/config/`. When updating an older checkout, run `bash migrate-config.sh` after extracting the update to move the existing JSON files, preserving local edits and the build counter. Translation dictionaries remain in `src/locales/`; user profiles are unchanged.

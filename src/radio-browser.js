@@ -86,7 +86,10 @@ function createRadioCatalogue(app, defaults) {
     const url = urlField('url', true);
     if (radios.some(s => s.id !== id && s.url === url))
       throw Error('Stream URL already exists');
-    const station = { ...old, id: id || require('node:crypto').randomUUID(), name, url, logo: urlField('logo'), homepage: urlField('homepage'), country: clean('country'), genre: clean('genre'), frequency: clean('frequency'), codec: old?.url === url ? old.codec || '' : '', bitrate: old?.url === url ? old.bitrate || 0 : 0 };
+    const number = clean('number') === '' ? null : Number(clean('number'));
+    if (number !== null && (!Number.isInteger(number) || number < 0 || number > 9999 || radios.some(s => s.id !== id && s.number === number)))
+      throw Error('Invalid or duplicate channel number');
+    const station = { ...old, number, id: id || require('node:crypto').randomUUID(), name, url, logo: urlField('logo'), homepage: urlField('homepage'), country: clean('country'), genre: clean('genre'), frequency: clean('frequency'), codec: old?.url === url ? old.codec || '' : '', bitrate: old?.url === url ? old.bitrate || 0 : 0 };
     persist(old ? radios.map(s => s.id === id ? station : s) : [...radios, station]);
     return station;
   }
@@ -105,6 +108,8 @@ function createRadioCatalogue(app, defaults) {
   function restore(station, index) {
     if (radios.some(s => s.id === station.id || s.url === station.url))
       throw Error('Station already exists');
+    if (station.number != null && radios.some(s => s.number === station.number))
+      throw Error('Invalid or duplicate channel number');
     const next = [...radios];
     next.splice(Math.min(index, next.length), 0, station);
     persist(next);

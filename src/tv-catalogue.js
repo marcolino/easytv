@@ -4,7 +4,7 @@ const { randomUUID } = require('node:crypto');
 
 function createTVCatalogue(app, originals, fetcher = globalThis.fetch) {
   const file = path.join(app.getPath('userData'), 'tv-catalogue.json');
-  const channels = [...originals];
+  const channels = originals.map(c => ({ ...c }));
   const originalIds = new Set(originals.map(c => c.id));
   const normalize = s => String(s || '').normalize('NFKD').replace(/[^a-z0-9]/gi, '').toLowerCase();
 
@@ -24,10 +24,24 @@ function createTVCatalogue(app, originals, fetcher = globalThis.fetch) {
     const number = input.number === '' || input.number == null ? null : Number(input.number);
     if (number !== null && (!Number.isInteger(number) || number < 0 || number > 9999 || channels.some(c => c.id !== id && c.number === number)))
       throw Error('Invalid or duplicate channel number');
-    return { id, name, number, directUrl: url(input.directUrl, true, true), url: url(input.url), logo: url(input.logo), source };
+    const directUrl = url(input.directUrl, false, true);
+    const webUrl = url(input.url);
+    if (!directUrl && !webUrl)
+      throw Error('At least one TV URL is required');
+    return { id, name, number, directUrl, url: webUrl, logo: url(input.logo), source };
   }
   try {
     for (const item of JSON.parse(fs.readFileSync(file, 'utf8'))) {
+      const service = channels.find(c => c.id === item.id && c.service);
+      if (service) {
+        try {
+          service.number = clean({ ...service, number: item.number }, service.id, undefined).number;
+        }
+        catch (e) {
+          console.warn('Service number:', e.message);
+        }
+        continue;
+      }
       if (!/^custom-[a-f0-9-]+$/.test(item.id) || channels.some(c => c.id === item.id))
         continue;
       try {
@@ -45,7 +59,7 @@ function createTVCatalogue(app, originals, fetcher = globalThis.fetch) {
 
   function commit(next) {
     fs.mkdirSync(path.dirname(file), { recursive: true });
-    fs.writeFileSync(file + '.tmp', JSON.stringify(next.filter(c => !originalIds.has(c.id)), null, 2) + '\n', { mode: 0o600 });
+    fs.writeFileSync(file + '.tmp', JSON.stringify(next.filter(c => !originalIds.has(c.id) || (c.service && c.number != null)).map(c => originalIds.has(c.id) ? { id: c.id, number: c.number } : c), null, 2) + '\n', { mode: 0o600 });
     fs.renameSync(file + '.tmp', file);
     channels.splice(0, channels.length, ...next);
   }
@@ -135,10 +149,21 @@ function createTVCatalogue(app, originals, fetcher = globalThis.fetch) {
   }
 
   function save(input, id = null, source = 'manual') {
+    const service = channels.find(c => c.id === id && c.service && originalIds.has(c.id));
+    if (service) {
+      const number = clean({ ...service, number: input.number }, id, undefined).number;
+      const updated = { ...service, number };
+      commit(channels.map(c => c.id === id ? updated : c));
+      return updated;
+    }
     if (id && (!channels.some(c => c.id === id) || originalIds.has(id)))
       throw Error('Cannot edit original channel');
     const c = clean(input, id || 'custom-' + randomUUID(), source);
-    if (channels.some(x => x.id !== c.id && x.directUrl === c.directUrl))
+    const previous = channels.find(x => x.id === c.id);
+    const sameStream = (a, b) => a.directUrl ? a.directUrl === b.directUrl : !b.directUrl && a.url === b.url;
+    // A new built-in service may duplicate a previously saved custom entry.
+    // Permit edits to that entry, but never introduce a new stream collision.
+    if (!(previous && sameStream(c, previous)) && channels.some(x => x.id !== c.id && sameStream(c, x)))
       throw Error('Stream already in catalogue');
     commit([...channels.filter(x => x.id !== c.id), c]);
     return c;
@@ -159,7 +184,7 @@ function createTVCatalogue(app, originals, fetcher = globalThis.fetch) {
   }
 
   function restore(c, index) {
-    if (channels.some(x => x.id === c.id || x.directUrl === c.directUrl))
+    if (channels.some(x => x.id === c.id || (c.directUrl ? x.directUrl === c.directUrl : !x.directUrl && x.url === c.url)))
       throw Error("Channel already exists");
     const item = clean(c, c.id, c.source);
     const next = [...channels];

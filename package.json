@@ -4,23 +4,23 @@
   "description": "Simple desktop TV streaming launcher",
   "main": "src/main.js",
   "scripts": {
-    "start": "TVSET=0 TMPDIR=\"$PWD/.tmp\" electron_config_cache=\"$PWD/.electron-cache\" electron --ozone-platform=x11 .",
-    "start:tvset": "TVSET=1 TMPDIR=\"$PWD/.tmp\" electron_config_cache=\"$PWD/.electron-cache\" electron --ozone-platform=x11 .",
+    "start": "TMPDIR=\"$PWD/.tmp\" electron_config_cache=\"$PWD/.electron-cache\" electron --ozone-platform=x11 .",
     "start:wayland": "TMPDIR=\"$PWD/.tmp\" electron_config_cache=\"$PWD/.electron-cache\" electron --ozone-platform=wayland .",
-    "check": "node --check src/main.js && node --check src/preload.js && node --check src/preferences.js && node --check src/i18n.js && node --check src/renderer/app.js && node --check scripts/increment-build.js && node --check scripts/i18n-check.js && node --check scripts/i18n-translate.js && node --check src/radio-browser.js && node --check src/renderer/radio.js && node --check src/renderer/tv.js && node --check src/tv-catalogue.js && node --check src/logo-finder.js && npm run i18n:check",
+    "check": "node --check src/main.js && node --check src/preload.js && node --check src/preferences.js && node --check src/i18n.js && node --check src/renderer/app.js && node --check scripts/increment-build.js && node --check scripts/i18n-check.js && node --check scripts/i18n-translate.js && node --check src/radio-browser.js && node --check src/renderer/radio.js && node --check src/renderer/tv.js && node --check src/tv-catalogue.js && node --check src/logo-finder.js && node --check src/reset-profile.js && node --check scripts/i18n-sort.js && npm run i18n:check",
     "i18n": "npm run i18n:translate && npm run i18n:check",
     "i18n:check": "node scripts/i18n-check.js",
     "i18n:sync": "node scripts/i18n-check.js --sync",
     "i18n:prune": "node scripts/i18n-check.js --prune",
     "i18n:translate": "npm run i18n:sync && node scripts/i18n-translate.js",
-    "build": "npm run i18n && npm run check && npm run build:win && npm run build:linux && echo \"\\n\\nAll builds complete!\"",
+    "build": "npm run check && npm run build:win && npm run build:linux && echo \"\\n\\nAll builds complete!\"",
     "prebuild:win": "node scripts/increment-build.js",
     "build:win": "electron-builder --win nsis --x64",
     "prebuild:linux": "node scripts/increment-build.js",
     "build:linux": "electron-builder --linux deb --x64",
     "prepack:linux": "node scripts/increment-build.js",
     "pack:linux": "electron-builder --linux --dir --x64",
-    "vm": "virt-manager"
+    "vm": "virt-manager",
+    "i18n:sort": "node scripts/i18n-sort.js"
   },
   "private": true,
   "license": "MIT",
@@ -32,6 +32,7 @@
   "homepage": "https://github.com/marcolino/easytv",
   "desktopName": "EasyTV",
   "dependencies": {
-    "hls.js": "^1.6.0"
+    "hls.js": "^1.6.0",
+    "@fontsource/open-sans": "^5.2.0"
   }
 }

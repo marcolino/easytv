@@ -6,7 +6,7 @@ const prune = process.argv.includes('--prune');
 const dryRun = process.argv.includes('--dry-run');
 if (sync && prune)
   throw new Error('Use --sync and --prune separately');
-const identicalOK = { it: ['Radio', 'TV', 'Web', 'Auto'], fr: ['Radio', 'TV', 'Genre', 'Web', 'Auto', 'Direct'], de: ['Radio', 'TV', 'Genre', 'Web', 'Auto'] };
+const overrides = require('../src/locales/translation-overrides.json');
 const keys = new Set();
 for (const file of ['main.js', 'renderer/app.js', 'renderer/index.html', 'renderer/radio.js', 'renderer/radio.html', 'renderer/tv.js', 'renderer/tv.html']) {
   const source = fs.readFileSync(path.join(root, file), 'utf8');
@@ -14,7 +14,7 @@ for (const file of ['main.js', 'renderer/app.js', 'renderer/index.html', 'render
     keys.add(m[2] || m[3]);
 }
 // Conditional translation calls cannot be extracted by the literal scanner.
-for (const key of ['TV', 'Radio', 'Shut down the device', 'Exit EasyTV'])
+for (const key of ['TV', 'Radio', 'Exit EasyTV'])
   keys.add(key);
 const placeholders = s => [...s.matchAll(/\{(\w+)\}/g)].map(m => m[1]).sort().join(',');
 let errors = 0;
@@ -31,11 +31,15 @@ for (const lang of ['en', 'it', 'fr', 'de']) {
         continue;
       }
     }
+    if (Object.hasOwn(overrides[lang] || {}, key) && data[key] !== overrides[lang][key]) {
+      if (sync) data[key] = overrides[lang][key];
+      else { console.error(lang, 'override mismatch:', key); errors++; }
+    }
     if (typeof data[key] !== 'string' || !data[key].trim() || placeholders(key) !== placeholders(data[key])) {
       console.error(lang, 'invalid:', key);
       errors++;
     }
-    else if (lang !== 'en' && data[key] === key && !identicalOK[lang]?.includes(key))
+    else if (lang !== 'en' && data[key] === key && overrides[lang]?.[key] !== key)
       console.warn(lang, 'identical to English (review):', key);
   }
   for (const key of Object.keys(data)) {
@@ -46,6 +50,6 @@ for (const lang of ['en', 'it', 'fr', 'de']) {
       delete data[key];
   }
   if ((sync || prune) && !dryRun)
-    fs.writeFileSync(file, JSON.stringify(data, null, 2) + '\n');
+    fs.writeFileSync(file, JSON.stringify(Object.fromEntries(Object.keys(data).sort().map(key => [key, data[key]])), null, 2) + '\n');
 }
 process.exitCode = errors ? 1 : 0;

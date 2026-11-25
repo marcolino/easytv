@@ -1,0 +1,74 @@
+[
+  {
+    "id": "service-netflix",
+    "name": "Netflix",
+    "url": "https://www.netflix.com/",
+    "group": "STREAMING",
+    "service": true,
+    "number": 101,
+    "logo": "https://cdn.simpleicons.org/netflix/E50914"
+  },
+  {
+    "id": "service-prime-video",
+    "name": "Prime Video",
+    "url": "https://www.primevideo.com/",
+    "group": "STREAMING",
+    "service": true,
+    "number": 102,
+    "logo": "https://www.google.com/s2/favicons?domain=www.primevideo.com&sz=128"
+  },
+  {
+    "id": "service-disney-plus",
+    "name": "Disney+",
+    "url": "https://www.disneyplus.com/",
+    "group": "STREAMING",
+    "service": true,
+    "number": 103,
+    "logo": "https://www.google.com/s2/favicons?domain=www.disneyplus.com&sz=128"
+  },
+  {
+    "id": "service-apple-tv",
+    "name": "Apple TV",
+    "url": "https://tv.apple.com/",
+    "group": "STREAMING",
+    "service": true,
+    "number": 104,
+    "logo": "https://cdn.simpleicons.org/apple/FFFFFF"
+  },
+  {
+    "id": "service-dazn",
+    "name": "DAZN",
+    "url": "https://www.dazn.com/",
+    "group": "STREAMING",
+    "service": true,
+    "number": 105,
+    "logo": "https://cdn.simpleicons.org/dazn/FFFFFF"
+  },
+  {
+    "id": "service-now",
+    "name": "NOW",
+    "url": "https://www.nowtv.it/",
+    "group": "STREAMING",
+    "service": true,
+    "number": 106,
+    "logo": "https://www.google.com/s2/favicons?domain=www.nowtv.it&sz=128"
+  },
+  {
+    "id": "service-paramount-plus",
+    "name": "Paramount+",
+    "url": "https://www.paramountplus.com/it/",
+    "group": "STREAMING",
+    "service": true,
+    "number": 107,
+    "logo": "https://www.google.com/s2/favicons?domain=www.paramountplus.com&sz=128"
+  },
+  {
+    "id": "service-youtube",
+    "name": "YouTube",
+    "url": "https://www.youtube.com/",
+    "group": "STREAMING",
+    "service": true,
+    "number": 108,
+    "logo": "https://cdn.simpleicons.org/youtube/FF0000"
+  }
+]

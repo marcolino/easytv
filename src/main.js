@@ -1,20 +1,28 @@
 const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, components, session, globalShortcut, dialog } = require('electron');
 const path = require('node:path');
-const { execFile } = require('node:child_process');
-const tvCatalogue = require('./tv-catalogue').createTVCatalogue(app, require('./tvs.json'));
+const fs = require('node:fs');
+
+// Isolate development preferences and browser sessions from installed builds.
+if (!app.isPackaged) {
+  const devData = path.join(app.getPath('appData'), 'easytv-dev');
+  fs.mkdirSync(devData, { recursive: true });
+  app.setPath('userData', devData);
+  app.setPath('sessionData', devData);
+}
+
+const tvCatalogue = require('./tv-catalogue').createTVCatalogue(app, [...require('./config/tvs.json'), ...require('./config/services.json')]);
 const channels = tvCatalogue.channels;
 const { createRadioCatalogue } = require('./radio-browser');
-const radioCatalogue = createRadioCatalogue(app, require('./radios.json'));
+const radioCatalogue = createRadioCatalogue(app, require('./config/radios.json'));
 const radios = radioCatalogue.radios;
 const { dictionaries, languages, resolveLanguage, translate } = require('./i18n');
 const { createPreferences } = require('./preferences');
-const buildInfo = require('./build-info.json');
+const buildInfo = require('./config/build-info.json');
 const appVersion = require('../package.json').version;
 const appTitle = `EasyTV ${appVersion} · build ${buildInfo.build}`;
 const appIcon = path.join(__dirname, '../assets/logos/easytv.png');
 // The system tray is disabled unless explicitly enabled.
 const trayEnabled = process.env.EASYTV_TRAY === '1';
-const tvsetEnabled = process.env.TVSET === '1';
 const preferences = createPreferences(app, channels, radios);
 let settingsScreenOpen = false;
 let previewLanguage = null;
@@ -31,6 +39,36 @@ let streamWindow = null;
 let tray = null;
 let currentChannelId = null;
 let currentRadioId = null;
+let lastSelection = null;
+let previousSelection = null;
+
+function rememberSelection(type, id) {
+  if (lastSelection?.type === type && lastSelection.id === id)
+    return;
+  previousSelection = lastSelection;
+  lastSelection = { type, id };
+}
+
+function showChannelDigits() {
+  const win = BrowserWindow.getFocusedWindow() || streamWindow || mainWindow;
+  if (!win || win.isDestroyed())
+    return;
+  win.webContents.executeJavaScript(`(() => {
+    const host = document.fullscreenElement || document.body;
+    if (!host || /^(VIDEO|IFRAME)$/.test(host.tagName)) return;
+    let osd = document.getElementById('easytv-number-osd');
+    if (!osd) {
+      osd = document.createElement('div');
+      osd.id = 'easytv-number-osd';
+      Object.assign(osd.style, { position: 'fixed', left: '4vw', bottom: '4vh', zIndex: '2147483647', background: 'rgba(255,255,255,.75)', color: '#111', padding: '.15em .4em', borderRadius: '8px', font: 'bold 8vh system-ui', pointerEvents: 'none', transition: 'opacity 100ms' });
+    }
+    host.appendChild(osd);
+    const digits = ${JSON.stringify(channelDigits)};
+    if (digits) osd.textContent = digits;
+    osd.style.opacity = digits ? '1' : '0';
+  })()`).catch(() => {});
+}
+
 // Conventional TV-style numeric channel selection.
 let channelDigits = '';
 let channelTimer = null;
@@ -46,15 +84,17 @@ function cancelChannelNumber() {
     channelTimer = null;
   }
   channelDigits = '';
+  showChannelDigits();
 }
 
 function handleChannelDigit(digit) {
   channelDigits += digit;
+  showChannelDigits();
   if (channelTimer) {
     clearTimeout(channelTimer);
     channelTimer = null;
   }
-  if (channelDigits.length >= 3) {
+  if (channelDigits.length >= 4) {
     selectNumberedChannel();
     return;
   }
@@ -70,11 +110,15 @@ function selectNumberedChannel() {
     return;
   const number = Number(channelDigits);
   channelDigits = '';
-  const channel = channels.find(item => item.number === number);
-  if (!channel) {
-    return;
+  showChannelDigits();
+  const channel = channels.find(item => item.number != null && String(item.number).trim() !== "" && Number(item.number) === number);
+  if (channel)
+    openChannel(channel.id);
+  else {
+    const radio = radios.find(item => item.number != null && String(item.number).trim() !== "" && Number(item.number) === number);
+    if (radio)
+      openRadio(radio.id);
   }
-  openChannel(channel.id);
 }
 
 function changeChannel(direction) {
@@ -118,6 +162,7 @@ function handleRemoteInput(event, input) {
   if (key === 'Backspace' && channelDigits) {
     event.preventDefault();
     channelDigits = channelDigits.slice(0, -1);
+    showChannelDigits();
     if (channelTimer) {
       clearTimeout(channelTimer);
       channelTimer = null;
@@ -125,6 +170,13 @@ function handleRemoteInput(event, input) {
     if (channelDigits) {
       channelTimer = setTimeout(selectNumberedChannel, 1500);
     }
+    return true;
+  }
+  if (key === 'Backspace' && previousSelection) {
+    event.preventDefault();
+    const target = previousSelection;
+    if (target.type === 'radio') openRadio(target.id);
+    else openChannel(target.id);
     return true;
   }
   // Escape cancels pending numeric entry.
@@ -165,7 +217,7 @@ function handleRemoteInput(event, input) {
 // ------------------------------------------------------------
 // Main channel-selection window
 // ------------------------------------------------------------
-function handleAppShortcut(event, input, streaming = false) {
+function handleAppShortcut(event, input, streaming = false, interactiveWeb = false) {
   if (!['F2', 'F10'].includes(input.key))
     return false;
   if (input.control || input.alt || input.meta || input.shift)
@@ -174,11 +226,8 @@ function handleAppShortcut(event, input, streaming = false) {
   if (input.type !== 'keyDown' || input.isAutoRepeat)
     return true;
   cancelChannelNumber();
-  if (input.key === 'F10') {
-    requestPowerOff().then(result => {
-      if (result?.action === 'unsupported')
-        dialog.showErrorBox('EasyTV', result.message);
-    }).catch(error => console.error('EasyTV power:', error));
+  if (input.key === 'F10' && !interactiveWeb) {
+    app.quit();
   }
   else {
     if (streaming && streamWindow && !streamWindow.isDestroyed())
@@ -186,7 +235,7 @@ function handleAppShortcut(event, input, streaming = false) {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.show();
       mainWindow.focus();
-      mainWindow.webContents.send('settings-shortcut');
+      if (input.key === 'F2') mainWindow.webContents.send('settings-shortcut');
     }
   }
   return true;
@@ -439,6 +488,7 @@ function openRadio(id, preview = false) {
   if (!preview)
     try {
       preferences.remember('radio', id);
+      rememberSelection('radio', id);
     }
     catch (e) {
       console.error(e);
@@ -482,6 +532,7 @@ function openChannel(channelId, forceWeb = false, preview = false) {
   if (!preview)
     try {
       preferences.remember('tv', channel.id);
+      rememberSelection('tv', channel.id);
     }
     catch (error) {
       console.error('EasyTV: unable to remember channel:', error);
@@ -511,8 +562,12 @@ function openChannel(channelId, forceWeb = false, preview = false) {
     }
   });
   const currentWindow = streamWindow;
+  // Non-broadcast web pages must retain normal browser keyboard input.
+  const host = new URL(channel.url).hostname;
+  const interactiveWeb = Boolean(channel.service || channel.source) && !/(^|\.)raiplay\.it$/i.test(host) && !channel.directUrl;
+  cancelChannelNumber();
   currentWindow.on('focus', () => {
-    enableStreamEscapeShortcut(currentWindow);
+    if (!interactiveWeb) enableStreamEscapeShortcut(currentWindow);
   });
   currentWindow.on('blur', () => {
     disableStreamEscapeShortcut(currentWindow);
@@ -523,10 +578,11 @@ function openChannel(channelId, forceWeb = false, preview = false) {
   }
   currentWindow.webContents.setAudioMuted(false);
   currentWindow.webContents.on('before-input-event', (event, input) => {
-    if (handleAppShortcut(event, input, true))
+    if (handleAppShortcut(event, input, true, interactiveWeb))
       return;
     if (input.type !== 'keyDown')
       return;
+    if (interactiveWeb) return;
     if (handleRemoteInput(event, input))
       return;
     // Close streaming even when the broadcaster uses DOM fullscreen.
@@ -549,16 +605,69 @@ function openChannel(channelId, forceWeb = false, preview = false) {
     if (currentWindow.isDestroyed())
       return;
     currentWindow.webContents.setAudioMuted(false);
-    hideCursor(currentWindow);
+    if (!interactiveWeb) hideCursor(currentWindow);
     if (channel.group === 'MEDIASET') {
       installMediasetFullscreen(currentWindow);
       recoverMediasetAudio(currentWindow);
     }
     try {
       // RaiPlay: start playback.
-      if (channel.group === 'RAI') {
+      if (new URL(channel.url).pathname.replace(/\/$/, '') === '/dirette/raistoria' && /(^|\.)raiplay\.it$/.test(host)) {
+        // Use the actual visible play control, as with a manual mouse click.
+        const wc = currentWindow.webContents;
+        for (let attempt = 0; attempt < 12; attempt++) {
+          await new Promise(resolve => setTimeout(resolve, attempt ? 3000 : 1800));
+          if (currentWindow.isDestroyed() || streamWindow !== currentWindow) break;
+          const point = await wc.executeJavaScript(`(() => {
+            if ([...document.querySelectorAll('video')].some(v => !v.paused && !v.ended)) return { playing: true };
+            const a = document.querySelector('a[data-play-button][data-video-json="/dirette/raistoria.json"]');
+            const el = a?.querySelector('.play-over-video') || a;
+            if (!el) return null;
+            const r = el.getBoundingClientRect();
+            const x = Math.round(r.left + r.width / 2), y = Math.round(r.top + r.height / 2);
+            if (!r.width || !r.height || !a.contains(document.elementFromPoint(x, y))) return null;
+            return { x, y };
+          })()`);
+          if (point?.playing) break;
+          if (!point) continue;
+          wc.sendInputEvent({ type: 'mouseMove', x: point.x, y: point.y });
+          wc.sendInputEvent({ type: 'mouseDown', x: point.x, y: point.y, button: 'left', clickCount: 1 });
+          wc.sendInputEvent({ type: 'mouseUp', x: point.x, y: point.y, button: 'left', clickCount: 1 });
+          break;
+        }
+      }
+      else if (channel.group === 'RAI' || new URL(channel.url).hostname === 'www.raiplay.it') {
         await currentWindow.webContents.executeJavaScript(`
-          document.querySelector('.play-over-video')?.click();
+          (() => {
+            // RaiPlay may render its play overlay after DOM ready.
+            if (window.__easyRaiPlayStart) return;
+            window.__easyRaiPlayStart = true;
+            const deadline = Date.now() + 45000;
+            let lastClick = 0;
+            let attempts = 0;
+            function tryStart() {
+              const videos = [...document.querySelectorAll('video')];
+              if (videos.some(v => !v.paused && !v.ended)) return true;
+              if (Date.now() >= deadline || attempts >= 6) return true;
+              const liveButton = document.querySelector('a[data-play-button][data-video-json="' + location.pathname.replace(new RegExp('/$'), '') + '.json"]');
+              const button = (liveButton?.getClientRects().length ? liveButton : null) || [...document.querySelectorAll('.play-over-video, button[aria-label], button[title], [role=button][aria-label]')].find(el => {
+                if (!el.getClientRects().length || el.disabled) return false;
+                return el.matches('.play-over-video') || /^(play|riproduci|avvia riproduzione)$/i.test((el.getAttribute('aria-label') || el.title || '').trim());
+              });
+              if (button && button.getClientRects().length && Date.now() - lastClick >= 4000) {
+                lastClick = Date.now();
+                attempts++;
+                button.click();
+              }
+              return false;
+            }
+            if (!tryStart()) {
+              const timer = setInterval(() => {
+                if (tryStart()) clearInterval(timer);
+              }, 250);
+              window.addEventListener('pagehide', () => clearInterval(timer), { once: true });
+            }
+          })();
         `);
       }
       // LA7: click the fake overlay to start playback.
@@ -735,10 +844,10 @@ function openChannel(channelId, forceWeb = false, preview = false) {
     }
   });
   if (currentWindow.isFocused()) {
-    enableStreamEscapeShortcut(currentWindow);
+    if (!interactiveWeb) enableStreamEscapeShortcut(currentWindow);
   }
   // One banner per channel selection; do not repeat it on automatic fallback.
-  if (!forceWeb)
+  if (!forceWeb && !interactiveWeb)
     currentWindow.webContents.once('did-finish-load', () => {
       if (currentWindow.isDestroyed() || streamWindow !== currentWindow)
         return;
@@ -753,7 +862,7 @@ function openChannel(channelId, forceWeb = false, preview = false) {
         if (!host || /^(VIDEO|IFRAME)$/.test(host.tagName)) return;
         const banner = document.createElement('div');
         banner.textContent = name;
-        Object.assign(banner.style, {position:'fixed', inset:'0', display:'flex', alignItems:'center', justifyContent:'center', pointerEvents:'none', zIndex:'2147483647', color:'gold', fontFamily:'Arial Rounded MT Bold, Trebuchet MS, system-ui, sans-serif', fontWeight:'600', fontSize:'46vh', lineHeight:'1', whiteSpace:'nowrap', opacity:'0.7', textShadow:'0 2px 12px #0005', transition:'opacity .5s'});
+        Object.assign(banner.style, {position:'fixed', inset:'0', display:'flex', alignItems:'center', justifyContent:'center', pointerEvents:'none', zIndex:'2147483647', color:'#f8ffba', fontFamily:'Arial Rounded MT Bold, Trebuchet MS, system-ui, sans-serif', fontWeight:'800', fontSize:'46vh', lineHeight:'1', whiteSpace:'nowrap', opacity:'0.7', textShadow:'0 2px 12px #0005', transition:'opacity .5s'});
         host.appendChild(banner);
         const range = document.createRange(); range.selectNodeContents(banner);
         const width = range.getBoundingClientRect().width;
@@ -820,29 +929,8 @@ function showMainFromTray() {
 // ------------------------------------------------------------
 // Settings and deliberate power-off
 // ------------------------------------------------------------
-async function requestPowerOff() {
-  if (!tvsetEnabled) {
-    app.quit();
-    return { action: 'quit' };
-  }
-  if (process.platform !== 'linux') {
-    return { action: 'unsupported', message: t('TVSET shutdown is supported on Linux only.') };
-  }
-  const answer = dialog.showMessageBoxSync(BrowserWindow.getFocusedWindow() || mainWindow, {
-    type: 'warning', title: t('Shut down the device?'),
-    message: t('Do you want to shut down the device?'),
-    detail: t('EasyTV will close and the computer will shut down.'),
-    buttons: [t('Cancel'), t('Shut down')], defaultId: 0, cancelId: 0, noLink: true
-  });
-  if (answer !== 1)
-    return { action: 'cancelled' };
-  execFile('systemctl', ['poweroff'], { timeout: 10000 }, error => {
-    if (error) {
-      console.error('EasyTV: shutdown failed:', error);
-      dialog.showErrorBox('EasyTV', t('Shutdown failed: {message}', { message: error.message }));
-    }
-  });
-  return { action: 'shutdown-requested' };
+function requestPowerOff() {
+  app.quit();
 }
 // ------------------------------------------------------------
 // IPC
@@ -931,8 +1019,7 @@ ipcMain.handle('get-channels', () => channels);
 ipcMain.handle('get-app-info', () => ({
   version: appVersion,
   build: buildInfo.build,
-  fullscreen: mainWindow?.isFullScreen() ?? false,
-  tvset: tvsetEnabled
+  fullscreen: mainWindow?.isFullScreen() ?? false
 }));
 ipcMain.handle('get-i18n', () => ({ dictionaries, languages, systemLanguage: resolveLanguage('auto', systemLanguages()) }));
 ipcMain.on('preview-language', (event, language) => {
@@ -943,6 +1030,25 @@ ipcMain.on('preview-language', (event, language) => {
 });
 ipcMain.handle('get-preferences', () => preferences.get());
 ipcMain.handle('save-preferences', (_event, data) => preferences.update(data));
+ipcMain.handle('reset-profile', async event => {
+  tvAuthorized(event);
+  if (!settingsScreenOpen)
+    throw new Error('Settings must be open');
+  const answer = dialog.showMessageBoxSync(mainWindow, {
+    type: 'warning',
+    title: t('Restore default settings'),
+    message: t('Restore the default configuration?'),
+    detail: t('Custom stations, favorites, groups and preferences in this profile will be reset. A backup will be kept. EasyTV will restart.'),
+    buttons: [t('Cancel'), t('Restore default settings')],
+    defaultId: 0, cancelId: 0, noLink: true
+  });
+  if (answer !== 1)
+    return false;
+  require('./reset-profile').resetProfile(app.getPath('userData'));
+  app.relaunch();
+  app.exit(0);
+  return true;
+});
 ipcMain.handle('request-power-off', () => requestPowerOff());
 ipcMain.on('settings-screen-state', (event, isOpen) => {
   if (mainWindow && !mainWindow.isDestroyed() && event.sender === mainWindow.webContents) {
@@ -1006,6 +1112,8 @@ ipcMain.handle('import-tv', (e, key) => {
 });
 ipcMain.handle('save-tv', (e, input, id) => {
   tvAuthorized(e);
+  if (input.number != null && String(input.number).trim() !== '' && radios.some(s => s.number === Number(input.number)))
+    throw Error('Invalid or duplicate channel number');
   return tvCatalogue.save(input, id);
 });
 ipcMain.handle('preview-tv', (e, id) => {
@@ -1034,6 +1142,8 @@ ipcMain.handle('restore-tv', (e, token) => {
   const entry = deletedTVs.get(token);
   if (!entry)
     throw Error('Undo expired');
+  if (entry.channel.number != null && radios.some(s => s.number === entry.channel.number))
+    throw Error('Invalid or duplicate channel number');
   const channel = tvCatalogue.restore(entry.channel, entry.index);
   const prefs = preferences.restoreTV(channel.id, entry.before);
   deletedTVs.delete(token);
@@ -1042,6 +1152,8 @@ ipcMain.handle('restore-tv', (e, token) => {
 const deletedRadios = new Map();
 ipcMain.handle('save-radio', (e, input, id) => {
   tvAuthorized(e);
+  if (input.number != null && String(input.number).trim() !== '' && channels.some(s => s.number === Number(input.number)))
+    throw Error('Invalid or duplicate channel number');
   return { ...radioCatalogue.save(input, id), editable: true };
 });
 ipcMain.handle('delete-radio', (e, id) => {
@@ -1068,6 +1180,8 @@ ipcMain.handle('restore-radio', (e, token) => {
   const entry = deletedRadios.get(token);
   if (!entry)
     throw Error('Undo expired');
+  if (entry.station.number != null && channels.some(s => s.number === entry.station.number))
+    throw Error('Invalid or duplicate channel number');
   const station = radioCatalogue.restore(entry.station, entry.index);
   const prefs = preferences.restoreRadio(station.id, entry.before);
   deletedRadios.delete(token);

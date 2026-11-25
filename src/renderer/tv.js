@@ -6,6 +6,7 @@
   const lang = prefs.language === 'auto' ? locale.systemLanguage : prefs.language;
   const t = key => locale.dictionaries[lang]?.[key] || key;
   const video = $('video');
+  let connecting = true;
   let hls, timer, lastProgress = Date.now(), lastTime = -1, attempts = 0, failed = false, retryTimer, generation = 0;
   $('name').textContent = info.channel.name;
   $('web').textContent = t('Official player');
@@ -25,7 +26,7 @@
     document.body.classList.remove('idle');
     $('overlay').classList.remove('hidden');
     clearTimeout(timer);
-    if (!failed)
+    if (!failed && !connecting)
       timer = setTimeout(() => {
         if (!failed) {
           document.body.classList.add('idle');
@@ -65,11 +66,14 @@
       return;
     }
     $('status').textContent = t('Direct streaming failed');
+    $('web').disabled = $('retry').disabled = false;
   }
 
   function start() {
     stop();
     failed = false;
+    connecting = true;
+    $('web').disabled = $('retry').disabled = true;
     lastProgress = Date.now();
     lastTime = -1;
     $('status').textContent = t('Connecting to TV channel...');
@@ -92,8 +96,12 @@
     hls.attachMedia(video);
   }
   video.addEventListener('playing', () => {
+    connecting = false;
     $('status').textContent = t('Live TV');
-    reveal();
+    clearTimeout(timer);
+    $('overlay').classList.add('hidden');
+    $('web').disabled = $('retry').disabled = false;
+    timer = setTimeout(() => document.body.classList.add('idle'), 2500);
   });
   video.addEventListener('resize', () => {
     $('quality').textContent = video.videoHeight ? `${video.videoWidth} × ${video.videoHeight}` : '';

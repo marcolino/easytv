@@ -1,0 +1,25 @@
+{
+  "de": {
+    "Auto": "Auto",
+    "Direct": "Direkt",
+    "Genre": "Genre",
+    "Radio": "Radio",
+    "TV": "TV",
+    "Web": "Web"
+  },
+  "fr": {
+    "Auto": "Auto",
+    "Direct": "Direct",
+    "Genre": "Genre",
+    "Radio": "Radio",
+    "TV": "TV",
+    "Web": "Web"
+  },
+  "it": {
+    "Auto": "Auto",
+    "Direct": "Diretto",
+    "Radio": "Radio",
+    "TV": "TV",
+    "Web": "Web"
+  }
+}
