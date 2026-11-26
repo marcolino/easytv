@@ -24,6 +24,7 @@ const appIcon = path.join(__dirname, '../assets/logos/easytv.png');
 // The system tray is disabled unless explicitly enabled.
 const trayEnabled = process.env.EASYTV_TRAY === '1';
 const preferences = createPreferences(app, channels, radios);
+const epg = require('./epg-service').createEPGService(app.getPath('userData'), require('./config/epg.json'));
 let settingsScreenOpen = false;
 let previewLanguage = null;
 
@@ -1028,6 +1029,23 @@ ipcMain.on('preview-language', (event, language) => {
     updateTrayMenu();
   }
 });
+ipcMain.handle('epg-status', event => {
+  epgAuthorized(event);
+  return epg.status();
+});
+
+ipcMain.handle('epg-now-next', (event, id) => {
+  console.log('EPG request:', {
+    senderId: event.sender.id,
+    senderURL: event.sender.getURL(),
+    mainId: mainWindow?.webContents.id,
+    mainURL: mainWindow?.webContents.getURL(),
+    channelId: id
+  });
+
+  epgAuthorized(event);
+  return epg.programmes(channels.find(c => c.id === id));
+});
 ipcMain.handle('get-preferences', () => preferences.get());
 ipcMain.handle('save-preferences', (_event, data) => preferences.update(data));
 const configTransfer = require('./config-transfer');
@@ -1120,6 +1138,7 @@ app.whenReady().then(async () => {
     callback({});
   });
   createMainWindow();
+  void epg.start();
   if (trayEnabled) {
     createTray();
   }
@@ -1134,6 +1153,7 @@ app.on('window-all-closed', () => {
   }
 });
 app.on('before-quit', () => {
+  epg.stop();
   if (streamWindow && !streamWindow.isDestroyed()) {
     streamWindow.destroy();
   }
@@ -1142,6 +1162,32 @@ app.on('before-quit', () => {
 function tvAuthorized(event) {
   if (event.sender !== mainWindow?.webContents)
     throw Error('Unauthorized');
+}
+function epgAuthorized(event) {
+  const sender = event.sender;
+  const frame = event.senderFrame;
+
+  if (!frame || frame !== sender.mainFrame)
+    throw Error('Unauthorized');
+
+  const localURL = file => require('url').pathToFileURL(
+    path.join(__dirname, 'renderer', file)
+  ).href;
+
+  const url = frame.url.split(/[?#]/)[0];
+
+  if (sender === mainWindow?.webContents &&
+      url === localURL('index.html'))
+    return;
+
+  if (directTV &&
+      directTV.win === streamWindow &&
+      !directTV.win.isDestroyed() &&
+      sender === directTV.win.webContents &&
+      url === localURL('tv.html'))
+    return;
+
+  throw Error('Unauthorized');
 }
 ipcMain.handle('search-tvs', (e, q) => {
   tvAuthorized(e);

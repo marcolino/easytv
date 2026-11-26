@@ -1,0 +1,17 @@
+{
+  "url": "https://epgshare01.online/epgshare01/epg_ripper_IT1.xml.gz",
+  "refreshHours": 6,
+  "channelMap": {
+    "rai1": "Rai1.it",
+    "rai2": "Rai2.it",
+    "rai3": "Rai3.it",
+    "rainews24": "RaiNews24.it",
+    "rete4": "Rete.4.it",
+    "canale5": "Canale.5.it",
+    "italia1": "Italia.1.it",
+    "tgcom24": "TGCom.it",
+    "la7": "LA7.HD.it",
+    "tv8": "TV8.HD.it",
+    "nove": "Nove.it"
+  }
+}

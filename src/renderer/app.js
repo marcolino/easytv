@@ -965,6 +965,17 @@ async function initialize() {
       }
     });
   }
+  const epgRefresh = document.getElementById('refresh-epg');
+  epgRefresh.addEventListener('click', async () => {
+    epgRefresh.disabled = true;
+    try {
+      const result = await window.easyTV.refreshEPG();
+      if (result.error) notify(t('Error: {message}', { message: result.error }), 'error');
+      else notify(t('Programme guide updated: {count} programmes.', { count: result.programmes }));
+    }
+    catch (error) { notify(t('Error: {message}', { message: error.message }), 'error'); }
+    finally { epgRefresh.disabled = false; }
+  });
   const reset = document.getElementById('reset-profile');
   reset.addEventListener('click', async () => {
     if (saving)
