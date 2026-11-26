@@ -1,4 +1,4 @@
-# EasyTV
+# EasyTV 1.1.0
 
 EasyTV is a desktop launcher for live television, internet radio and subscription streaming services. Its fullscreen Home is designed for use on a television with a mouse, keyboard or keyboard-emulating remote control.
 
@@ -8,17 +8,17 @@ EasyTV is a desktop launcher for live television, internet radio and subscriptio
 
 | Platform | Package | Status |
 |---|---|---|
-| Linux x64 | Debian `.deb` | Tested |
+| Linux x64 | Debian `.deb` / AppImage | Debian tested; AppImage packaging verified |
 | Windows x64 | NSIS `.exe` | Earlier builds tested |
-| macOS ARM64 / Intel x64 | `.dmg` / `.zip` | Experimental; physical hardware and DRM unverified |
+| macOS ARM64 and Intel x64 | `.dmg` / `.zip` | Experimental; packaging verified, runtime and DRM unverified |
 
 On Linux, install the downloaded package (adjust the filename as needed):
 
 ```bash
-sudo apt install ./easytv_1.0.0_amd64.deb
+sudo apt install ./EasyTV-1.1.0-linux-x64.deb
 ```
 
-On Windows, run the installer. On macOS, experimental builds are available through the manually triggered GitHub Actions workflow after a successful build. They are not Developer ID signed or notarized. See [BUILD.md](BUILD.md) for development and packaging instructions.
+Download packages from [GitHub Releases](https://github.com/marcolino/easytv/releases). On Windows, run the installer. On macOS, experimental builds are unsigned and not notarized. See [BUILD.md](BUILD.md) for development and packaging instructions.
 
 ## Using EasyTV
 
@@ -100,7 +100,7 @@ Direct is the default when a direct stream URL is available; otherwise Web is us
 | Direct | Plays the supplied stream, including HLS through hls.js |
 | Auto | Tries direct playback and falls back to the official player after recovery fails |
 
-Only applicable modes are available for each channel. Radio supports ordinary audio streams and HLS, with reconnection and audio visualization where supported. Auto does not diagnose audio/video synchronization issues.
+Only applicable modes are available for each channel. Radio supports ordinary audio streams and HLS, with reconnection and audio visualization where supported. Auto does not diagnose audio/video synchronization issues. Direct TV playback retains a recent video frame during reconnection and displays a loading indicator after approximately one second of stalled playback. Recovery attempts remain bounded.
 
 ## Streaming services and DRM
 
@@ -112,10 +112,16 @@ Netflix login and playback have been confirmed in the Linux development environm
 
 On Linux, development launches use `~/.config/easytv-dev/` and installed builds use `~/.config/easytv/`. Each has independent settings, catalogues, logo cache and browser sessions. Ordinary updates preserve saved preferences, although new factory entries may be merged into existing catalogues.
 
+The Configuration section in Settings provides export, import and factory reset.
+
+Export saves the committed preferences and custom catalogue entries in a versioned JSON file. It includes numbers, favorites, groups, playback modes, language, last station and logo URLs. It excludes browser cookies, authentication sessions, DRM data, caches and build information. Custom URLs may contain private tokens; keep exports private.
+
+Import replaces the saved configuration rather than merging it. EasyTV validates the file, asks for confirmation, backs up the current settings and catalogues in `import-backup-*`, and restarts. Failed writes are rolled back. Canceling leaves the active configuration unchanged. Browser sessions remain local to the original profile; exporting does not transfer logins between computers.
+
 Restore default configuration (at the bottom of Settings) asks for confirmation, backs up the active profile JSON files into `reset-backup-*`, and restarts EasyTV. It resets favorites, groups, custom entries, playback preferences, language and last station. Browser cookies and DRM data are retained. To restore a backup, close EasyTV and copy its saved JSON files back into the active profile. The other profile is not affected.
 
 The optional system tray is disabled by default. To enable it for a development launch, use `EASYTV_TRAY=1 npm start`. Closing windows may then leave the application running; OFF/F10 on Home explicitly quits.
 
 ## Development and support
 
-See [BUILD.md](BUILD.md). Repository: https://github.com/marcolino/easytv
+See [BUILD.md](BUILD.md) and [CHANGELOG.md](CHANGELOG.md). Repository: https://github.com/marcolino/easytv

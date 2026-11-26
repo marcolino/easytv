@@ -1,6 +1,6 @@
 {
   "name": "easytv",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Simple desktop TV streaming launcher",
   "main": "src/main.js",
   "scripts": {
