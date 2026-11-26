@@ -185,6 +185,41 @@ function channelButton(channel) {
   for (const digit of String(channel.number ?? ""))
     keys.append(element('kbd', 'channel-key', digit));
   b.append(logo, keys);
+  if (!channel.service) {
+    const originalTitle = b.title;
+    let request = 0;
+    let timer;
+    async function updateProgramme() {
+      const token = ++request;
+      try {
+        const data = await window.easyTV.getEPGNowNext(channel.id);
+        if (token !== request || !b.isConnected) return;
+        const lang = document.documentElement.lang || 'en';
+        b.title = [originalTitle,
+          data?.current && `${t('Now')}: ${window.epgUI.line(data.current, lang)}`,
+          data?.next && `${t('Next')}: ${window.epgUI.line(data.next, lang)}`
+        ].filter(Boolean).join('\n');
+      }
+      catch { b.title = originalTitle; }
+    }
+    function begin() {
+      clearInterval(timer);
+      void updateProgramme();
+      timer = setInterval(() => {
+        if (!b.isConnected) { clearInterval(timer); return; }
+        void updateProgramme();
+      }, 15000);
+    }
+    function end() {
+      if (b.matches(':hover, :focus')) return;
+      clearInterval(timer);
+      request++;
+    }
+    b.addEventListener('pointerenter', begin);
+    b.addEventListener('focus', begin);
+    b.addEventListener('pointerleave', end);
+    b.addEventListener('blur', end);
+  }
   return b;
 }
 

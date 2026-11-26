@@ -114,3 +114,31 @@ body, button, input, select, textarea {
 @keyframes loading-spin {
   to { transform: rotate(360deg); }
 }
+
+#programme-banner {
+  position: fixed;
+  top: 77%;
+  left: 5%;
+  width: 90%;
+  text-align: center;
+  font-size: clamp(18px, 4vh, 42px);
+  color: #f8ffba;
+  text-shadow: 0 2px 12px #000;
+  opacity: 0;
+  transition: opacity .5s;
+  pointer-events: none;
+  z-index: 11;
+}
+#programme-banner.visible { opacity: .9; }
+#programme-info {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 18px 28px;
+  background: #111e;
+  z-index: 12;
+  pointer-events: none;
+}
+#programme-info > * { margin: 4px 0; }
+#programme-progress { width: 100%; height: 8px; accent-color: #4d7dde; }

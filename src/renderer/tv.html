@@ -12,10 +12,18 @@
     <div id="loading-spinner" aria-hidden="true"></div>
     <div id="channel-banner" aria-hidden="true">
     </div>
+    <div id="programme-banner" aria-hidden="true"></div>
+    <section id="programme-info" hidden aria-label="Programme information">
+      <strong id="programme-channel"></strong>
+      <div id="programme-current"></div>
+      <progress id="programme-progress" max="100" value="0"></progress>
+      <div id="programme-next"></div>
+    </section>
     <aside id="overlay">
       <strong id="name"></strong><span id="quality"></span><span id="status" role="status"></span><button id="web"></button><button id="retry"></button>
     </aside>
     <script src="../../node_modules/hls.js/dist/hls.min.js"></script>
+    <script src="epg-ui.js"></script>
     <script src="tv.js"></script>
   </body>
 </html>

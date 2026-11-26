@@ -171,6 +171,45 @@
   video.addEventListener('resize', () => {
     $('quality').textContent = video.videoHeight ? `${video.videoWidth} × ${video.videoHeight}` : '';
   });
+  const programmeInfo = $('programme-info');
+  const programmeBanner = $('programme-banner');
+  let programmeData = null, programmeTimer, bannerTimer, epgPending = false;
+  programmeInfo.setAttribute('aria-label', t('Programme information'));
+  $('programme-channel').textContent = info.channel.name;
+
+  function renderProgramme() {
+    const current = programmeData?.current;
+    const next = programmeData?.next;
+    $('programme-current').textContent = current ? `${t('Now')}: ${window.epgUI.line(current, lang)}` : '';
+    $('programme-next').textContent = next ? `${t('Next')}: ${window.epgUI.line(next, lang)}` : '';
+    $('programme-progress').hidden = !current;
+    $('programme-progress').value = window.epgUI.progress(current);
+    if (!current && !next) $('programme-current').textContent = t('No programme information');
+    programmeBanner.textContent = window.epgUI.title(current, lang);
+  }
+
+  async function refreshProgramme() {
+    if (epgPending) return;
+    epgPending = true;
+    try { programmeData = await api.getEPGNowNext(info.channel.id); }
+    catch { programmeData = null; }
+    finally { epgPending = false; }
+    renderProgramme();
+  }
+
+  void refreshProgramme();
+  const epgTimer = setInterval(refreshProgramme, 15000);
+  const progressTimer = setInterval(renderProgramme, 1000);
+  document.addEventListener('keydown', event => {
+    if (event.key !== 'F3' || event.repeat || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+    event.preventDefault();
+    clearTimeout(programmeTimer);
+    programmeInfo.hidden = !programmeInfo.hidden;
+    if (!programmeInfo.hidden) {
+      void refreshProgramme();
+      programmeTimer = setTimeout(() => { programmeInfo.hidden = true; }, 5000);
+    }
+  });
   const banner = $('channel-banner');
   banner.textContent = info.channel.name;
 
@@ -185,7 +224,11 @@
   video.addEventListener('playing', () => {
     fitBanner();
     banner.classList.add('visible');
-    setTimeout(() => banner.classList.remove('visible'), 1500);
+    programmeBanner.classList.add('visible');
+    bannerTimer = setTimeout(() => {
+      banner.classList.remove('visible');
+      programmeBanner.classList.remove('visible');
+    }, 1500);
   }, { once: true });
   const watchdog = setInterval(() => {
     if (failed)
@@ -204,6 +247,10 @@
       showBuffering();
   }, 250);
   window.addEventListener('pagehide', () => {
+    clearInterval(epgTimer);
+    clearInterval(progressTimer);
+    clearTimeout(programmeTimer);
+    clearTimeout(bannerTimer);
     clearInterval(watchdog);
     clearInterval(frameTimer);
     clearTimeout(timer);
