@@ -79,22 +79,39 @@ jobs:
       - name: Verify packaged architecture
         run: |
           set -e
-          bundle=$(find dist -maxdepth 2 -type d -iname '*.app' -print -quit)
+
+          bundle=$(find dist -type d -iname 'easytv.app' -print -quit)
+
           if [ -z "$bundle" ]; then
-            echo '::error::No packaged application bundle found'
-            ls -la dist
+            echo "::error::Application bundle not found"
             exit 1
           fi
-          echo "Application bundle: $bundle"
-          executable=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$bundle/Contents/Info.plist")
+
+          executable=$(/usr/libexec/PlistBuddy \
+            -c 'Print :CFBundleExecutable' \
+            "$bundle/Contents/Info.plist")
+
           binary="$bundle/Contents/MacOS/$executable"
+
+          expected_arch="${{ matrix.arch }}"
+
+          if [ "$expected_arch" = "x64" ]; then
+            expected_arch="x86_64"
+          fi
+
+          echo "Application bundle: $bundle"
           echo "Executable: $binary"
+          echo "Expected architecture: $expected_arch"
+
           file "$binary"
           lipo -info "$binary"
-          if ! lipo -verify_arch ${{ matrix.arch }} "$binary"; then
-            echo '::error::Packaged executable has unexpected architecture'
+
+          if ! lipo "$binary" -verify_arch "$expected_arch"; then
+            echo "::error::Packaged executable has unexpected architecture"
             exit 1
           fi
+
+          echo "Architecture successfully verified"
 
       - name: Label installers by architecture
         run: |
