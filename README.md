@@ -2,7 +2,7 @@
 
 EasyTV is a desktop launcher for live television, internet radio and subscription streaming services. Its fullscreen Home is designed for use on a television with a mouse, keyboard or keyboard-emulating remote control.
 
-![EasyTV screenshot](screenshots/easytv-v3.png)
+![EasyTV screenshot](screenshots/easytv-v2.png)
 
 ## Installation
 
@@ -10,7 +10,7 @@ EasyTV is a desktop launcher for live television, internet radio and subscriptio
 |---|---|---|
 | Linux x64 | Debian `.deb` | Tested |
 | Windows x64 | NSIS `.exe` | Earlier builds tested |
-| macOS ARM64 | `.dmg` / `.zip` | Experimental; physical hardware and DRM unverified |
+| macOS ARM64 / Intel x64 | `.dmg` / `.zip` | Experimental; physical hardware and DRM unverified |
 
 On Linux, install the downloaded package (adjust the filename as needed):
 
@@ -18,7 +18,7 @@ On Linux, install the downloaded package (adjust the filename as needed):
 sudo apt install ./easytv_1.0.0_amd64.deb
 ```
 
-On Windows, run the installer. On macOS, experimental builds are unsigned and not notarized. See [BUILD.md](BUILD.md) for development and packaging instructions.
+On Windows, run the installer. On macOS, experimental builds are available through the manually triggered GitHub Actions workflow after a successful build. They are not Developer ID signed or notarized. See [BUILD.md](BUILD.md) for development and packaging instructions.
 
 ## Using EasyTV
 

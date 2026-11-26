@@ -126,13 +126,11 @@ Outputs are placed in `dist/`. Install the Debian package with `sudo apt install
 
 ### macOS
 
-The experimental Apple Silicon build uses DMG and ZIP targets, historically via a manually triggered GitHub Actions macOS runner. The workflow artifact is `easytv-macos-arm64`. A direct command is:
+The manually triggered `Build macOS` GitHub Actions workflow builds separate ARM64 (Apple Silicon) and x64 (Intel) DMG and ZIP packages on native macOS runners. Open the repository's Actions tab, select the workflow and choose Run workflow. Download `easytv-macos-arm64` or `easytv-macos-x64` from the completed run. Artifacts expire after 14 days.
 
-```bash
-npx electron-builder --mac --arm64 --publish never
-```
+The workflow generates the ICNS icon from `assets/logos/easytv-512.png`, runs source checks, uses `npm ci` when the lockfile is tracked (otherwise `npm install` with a warning), and verifies the packaged executable architecture. Keep the Castlabs dependency and download mirror. The two jobs run independently.
 
-Direct electron-builder calls bypass npm prebuild hooks. Increment explicitly if macOS packages should share the build counter, and decide how CI persists it. The existing experimental builds are unsigned and not notarized; production distribution requires signing, appropriate hardened-runtime settings and notarization. Verify the actual workflow and packaging configuration in the checkout before release.
+The workflow invokes electron-builder directly and deliberately does not increment or persist the shared local build counter. Identify CI packages by the GitHub Actions run and commit. No packages are published automatically. Experimental builds have no Developer ID signing or notarization; local ad-hoc signing may still be required by macOS. Successful packaging does not establish Widevine or playback compatibility. Test on actual Macs before distribution.
 
 ## Playback and input architecture
 

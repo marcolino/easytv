@@ -8,8 +8,21 @@ permissions:
 
 jobs:
   build:
-    runs-on: macos-15
+    name: macOS ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            runner: macos-15
+            node_arch: arm64
+          - arch: x64
+            runner: macos-15-intel
+            node_arch: x64
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
 
     steps:
       - name: Checkout repository
@@ -19,21 +32,22 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: 22
+          architecture: ${{ matrix.node_arch }}
           package-manager-cache: false
 
-      # The Castlabs dependency uses a public GitHub repository.
-      # Rewrite SSH URLs to HTTPS so no SSH key is needed.
       - name: Configure GitHub HTTPS access
         run: |
-          git config --global \
-            url."https://github.com/".insteadOf \
-            "ssh://git@github.com/"
-          git config --global --add \
-            url."https://github.com/".insteadOf \
-            "git@github.com:"
+          git config --global url."https://github.com/".insteadOf "ssh://git@github.com/"
+          git config --global --add url."https://github.com/".insteadOf "git@github.com:"
 
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: |
+          if git ls-files --error-unmatch package-lock.json >/dev/null 2>&1; then
+            npm ci --no-audit --no-fund
+          else
+            echo '::warning::No tracked package-lock.json; using npm install'
+            npm install --no-audit --no-fund
+          fi
 
       - name: Validate source
         run: npm run check
@@ -41,43 +55,40 @@ jobs:
       - name: Generate macOS application icon
         run: |
           set -e
-
           SOURCE="assets/logos/easytv-512.png"
           ICONSET="assets/logos/easytv.iconset"
-
           test -f "$SOURCE"
           mkdir -p "$ICONSET"
-
-          sips -z 16 16 "$SOURCE" --out "$ICONSET/icon_16x16.png"
-          sips -z 32 32 "$SOURCE" --out "$ICONSET/icon_16x16@2x.png"
-          sips -z 32 32 "$SOURCE" --out "$ICONSET/icon_32x32.png"
-          sips -z 64 64 "$SOURCE" --out "$ICONSET/icon_32x32@2x.png"
-          sips -z 128 128 "$SOURCE" --out "$ICONSET/icon_128x128.png"
-          sips -z 256 256 "$SOURCE" --out "$ICONSET/icon_128x128@2x.png"
-          sips -z 256 256 "$SOURCE" --out "$ICONSET/icon_256x256.png"
-          sips -z 512 512 "$SOURCE" --out "$ICONSET/icon_256x256@2x.png"
-          sips -z 512 512 "$SOURCE" --out "$ICONSET/icon_512x512.png"
-          sips -z 1024 1024 "$SOURCE" --out "$ICONSET/icon_512x512@2x.png"
-
-          iconutil -c icns "$ICONSET" \
-            -o assets/logos/easytv.icns
-
+          for size in 16 32 128 256 512; do
+            sips -z "$size" "$size" "$SOURCE" --out "$ICONSET/icon_${size}x${size}.png"
+            double=$((size * 2))
+            sips -z "$double" "$double" "$SOURCE" --out "$ICONSET/icon_${size}x${size}@2x.png"
+          done
+          iconutil -c icns "$ICONSET" -o assets/logos/easytv.icns
           rm -rf "$ICONSET"
 
       - name: Inspect Castlabs Electron distribution
         run: |
           node -p "require('electron/package.json').version"
-          ls -lah node_modules/electron/
-          ls -lah node_modules/electron/dist/ || true
-          find node_modules/electron -maxdepth 3 -name Electron.app -o -name electron
+          node -p 'process.arch'
+          file node_modules/electron/dist/Electron.app/Contents/MacOS/Electron
 
       - name: Build macOS application
-        run: npx electron-builder --mac --arm64 --publish never
+        run: npx --no-install electron-builder --mac --${{ matrix.arch }} --publish never
+
+      - name: Verify packaged architecture
+        run: |
+          set -e
+          bundle=$(find dist -type d -name EasyTV.app -print -quit)
+          test -n "$bundle"
+          executable=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$bundle/Contents/Info.plist")
+          binary="$bundle/Contents/MacOS/$executable"
+          lipo -verify_arch ${{ matrix.arch }} "$binary"
 
       - name: Upload installers
         uses: actions/upload-artifact@v7
         with:
-          name: easytv-macos-arm64
+          name: easytv-macos-${{ matrix.arch }}
           path: |
             dist/*.dmg
             dist/*.zip
