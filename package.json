@@ -6,7 +6,7 @@
   "scripts": {
     "start": "TMPDIR=\"$PWD/.tmp\" electron_config_cache=\"$PWD/.electron-cache\" electron --ozone-platform=x11 .",
     "start:wayland": "TMPDIR=\"$PWD/.tmp\" electron_config_cache=\"$PWD/.electron-cache\" electron --ozone-platform=wayland .",
-    "check": "node --check src/main.js && node --check src/preload.js && node --check src/preferences.js && node --check src/i18n.js && node --check src/renderer/app.js && node --check scripts/increment-build.js && node --check scripts/i18n-check.js && node --check scripts/i18n-translate.js && node --check src/radio-browser.js && node --check src/renderer/radio.js && node --check src/renderer/tv.js && node --check src/tv-catalogue.js && node --check src/logo-finder.js && node --check src/reset-profile.js && node --check scripts/i18n-sort.js && npm run i18n:check",
+    "check": "node --check src/main.js && node --check src/preload.js && node --check src/preferences.js && node --check src/i18n.js && node --check src/renderer/app.js && node --check scripts/increment-build.js && node --check scripts/i18n-check.js && node --check scripts/i18n-translate.js && node --check src/radio-browser.js && node --check src/renderer/radio.js && node --check src/renderer/tv.js && node --check src/tv-catalogue.js && node --check src/logo-finder.js && node --check src/reset-profile.js && node --check scripts/i18n-sort.js && npm run i18n:check && node --check src/config-transfer.js && npm test",
     "i18n": "npm run i18n:translate && npm run i18n:check",
     "i18n:check": "node scripts/i18n-check.js",
     "i18n:sync": "node scripts/i18n-check.js --sync",
@@ -20,7 +20,8 @@
     "prepack:linux": "node scripts/increment-build.js",
     "pack:linux": "electron-builder --linux --dir --x64",
     "vm": "virt-manager",
-    "i18n:sort": "node scripts/i18n-sort.js"
+    "i18n:sort": "node scripts/i18n-sort.js",
+    "test": "node --test"
   },
   "private": true,
   "license": "MIT",
