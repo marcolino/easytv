@@ -1,5 +1,6 @@
 const fs = require('node:fs');
 const path = require('node:path');
+const defaultRadios = require('./config/radios.json');
 
 function createLogoFinder(app, fetcher = globalThis.fetch) {
   const file = path.join(app.getPath('userData'), 'logo-cache.json');
@@ -28,15 +29,19 @@ function createLogoFinder(app, fetcher = globalThis.fetch) {
     const country = String(station.country || '').slice(0, 80);
     const key = JSON.stringify([kind, norm(name), norm(country)]);
     const old = cache[key];
+    const current = String(station.logo || "").trim();
+    const acceptable = url => Boolean(url && url !== current);
+    const pendingKey = JSON.stringify([key, force, current]);
     if (!force && old && Date.now() - old.time < (old.url ? 30 : 1) * 86400000)
-      return old.url;
-    if (pending.has(key))
-      return pending.get(key);
+      return acceptable(old.url) ? old.url : '';
+    if (pending.has(pendingKey))
+      return pending.get(pendingKey);
     if (pending.size >= 12)
       return '';
     const task = (async () => {
+      const known = kind === 'radio' && defaultRadios.find(r => norm(r.name) === norm(name) || (r.id === 'radio-radioitalia' && norm(name) === 'radioitalia'));
       const lang = /^(IT|Italy|Italia)$/i.test(country) ? 'it' : 'en';
-      const aliases = [...new Set([name, name.replace(/\s+/g, ''), kind === 'radio' ? name.replace(/\s+Network$/i, '') + ' Network' : name])];
+      const aliases = [...new Set([name, ...(known?.id === 'radio-radioitalia' ? ['Radio Italia', 'Radio Italia Solo Musica Italiana'] : []), name.replace(/\s+/g, ''), kind === 'radio' ? name.replace(/\s+Network$/i, '') + ' Network' : name])];
       const data = { search: [] };
       for (const alias of aliases) {
         try {
@@ -52,14 +57,15 @@ function createLogoFinder(app, fetcher = globalThis.fetch) {
       const matches = (data.search || []).filter(x => aliases.some(a => norm(x.label) === norm(a)) && type.test(x.description || '') && /^Q\d+$/.test(x.id));
       let url = '';
       for (const match of matches) {
-        const result = await query({ action: 'wbgetentities', ids: match.id, props: 'claims' });
+        const result = await query({ action: 'wbgetentities', ids: match.id, props: 'claims' }).catch(() => ({}));
         const claims = result.entities?.[match.id]?.claims;
         const countries = { it: 'Q38', italy: 'Q38', italia: 'Q38', fr: 'Q142', france: 'Q142', de: 'Q183', germany: 'Q183', gb: 'Q145', uk: 'Q145', us: 'Q30' };
         const expected = countries[norm(country)];
         const actual = (claims?.P17 || []).map(c => c.mainsnak?.datavalue?.value?.id);
-        const logo = (claims?.P154 || []).find(c => c.rank !== 'deprecated')?.mainsnak?.datavalue?.value;
-        if (typeof logo === 'string' && (!expected || actual.includes(expected)))
-          url = 'https://commons.wikimedia.org/wiki/Special:FilePath/' + encodeURIComponent(logo);
+        if (!expected || actual.includes(expected)) {
+          const logos = (claims?.P154 || []).filter(c => c.rank !== 'deprecated').map(c => c.mainsnak?.datavalue?.value).filter(x => typeof x === 'string');
+          url = logos.map(x => 'https://commons.wikimedia.org/wiki/Special:FilePath/' + encodeURIComponent(x)).find(acceptable) || '';
+        }
         if (url)
           break;
       }
@@ -72,7 +78,7 @@ function createLogoFinder(app, fetcher = globalThis.fetch) {
               continue;
             const rows = await r.json();
             const countryNorm = x => ({ italy: 'it', italia: 'it', france: 'fr', germany: 'de', deutschland: 'de', unitedkingdom: 'gb' }[norm(x)] || norm(x));
-            const candidates = rows.filter(x => aliases.some(a => norm(a) === norm(x.name)) && (!country || countryNorm(x.countrycode || x.country) === countryNorm(country)) && /^https:\/\//i.test(x.favicon || '') && x.favicon !== station.logo);
+            const candidates = rows.filter(x => aliases.some(a => norm(a) === norm(x.name)) && (!country || countryNorm(x.countrycode || x.country) === countryNorm(country)) && /^https:\/\//i.test(x.favicon || '') && acceptable(x.favicon));
             if (candidates.length) {
               url = candidates[0].favicon;
               break;
@@ -82,7 +88,9 @@ function createLogoFinder(app, fetcher = globalThis.fetch) {
           }
         }
       }
-      cache[key] = { url, time: Date.now() };
+      if (!url && known && acceptable(known.logo)) url = known.logo;
+      if (!force || url)
+        cache[key] = { url, time: Date.now() };
       try {
         fs.mkdirSync(path.dirname(file), { recursive: true });
         fs.writeFileSync(file + '.tmp', JSON.stringify(cache));
@@ -91,8 +99,8 @@ function createLogoFinder(app, fetcher = globalThis.fetch) {
       catch {
       }
       return url;
-    })().catch(() => '').finally(() => pending.delete(key));
-    pending.set(key, task);
+    })().catch(() => '').finally(() => pending.delete(pendingKey));
+    pending.set(pendingKey, task);
     return task;
   }
   return { find };

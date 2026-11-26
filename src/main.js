@@ -537,7 +537,7 @@ function openChannel(channelId, forceWeb = false, preview = false) {
     catch (error) {
       console.error('EasyTV: unable to remember channel:', error);
     }
-  const mode = preferences.get().tvPlayback?.[channel.id] || 'web';
+  const mode = preferences.get().tvPlayback?.[channel.id] || (channel.directUrl ? 'direct' : 'web');
   if (channel.directUrl && (preview || !channel.url || (!forceWeb && mode !== 'web')))
     return openDirectTV(channel, preview || !channel.url ? 'direct' : mode);
   if (!channel.url)
@@ -986,7 +986,7 @@ ipcMain.handle('direct-tv-web', event => {
   if (directTV && event.sender === directTV.win.webContents && streamWindow === directTV.win && directTV.channel.url)
     openChannel(directTV.channel.id, true);
 });
-ipcMain.handle('get-radios', () => radios.map(s => ({ ...s, editable: !radioCatalogue.originalIds.has(s.id) })));
+ipcMain.handle('get-radios', () => radios.map(s => ({ ...s, editable: true, original: radioCatalogue.originalIds.has(s.id) })));
 ipcMain.handle('search-radios', (event, query) => {
   if (event.sender !== mainWindow?.webContents)
     throw Error('Unauthorized');
@@ -1112,8 +1112,9 @@ ipcMain.handle('import-tv', (e, key) => {
 });
 ipcMain.handle('save-tv', (e, input, id) => {
   tvAuthorized(e);
-  if (input.number != null && String(input.number).trim() !== '' && radios.some(s => s.number === Number(input.number)))
-    throw Error('Invalid or duplicate channel number');
+  const conflict = input.number != null && String(input.number).trim() !== '' ? radios.find(s => s.number === Number(input.number)) : null;
+  if (conflict)
+    throw Error(`Channel number ${input.number} is already assigned to ${conflict.name}`);
   return tvCatalogue.save(input, id);
 });
 ipcMain.handle('preview-tv', (e, id) => {
@@ -1142,8 +1143,9 @@ ipcMain.handle('restore-tv', (e, token) => {
   const entry = deletedTVs.get(token);
   if (!entry)
     throw Error('Undo expired');
-  if (entry.channel.number != null && radios.some(s => s.number === entry.channel.number))
-    throw Error('Invalid or duplicate channel number');
+  const conflict = entry.channel.number == null ? null : radios.find(s => s.number === entry.channel.number);
+  if (conflict)
+    throw Error(`Channel number ${entry.channel.number} is already assigned to ${conflict.name}`);
   const channel = tvCatalogue.restore(entry.channel, entry.index);
   const prefs = preferences.restoreTV(channel.id, entry.before);
   deletedTVs.delete(token);
@@ -1152,9 +1154,11 @@ ipcMain.handle('restore-tv', (e, token) => {
 const deletedRadios = new Map();
 ipcMain.handle('save-radio', (e, input, id) => {
   tvAuthorized(e);
-  if (input.number != null && String(input.number).trim() !== '' && channels.some(s => s.number === Number(input.number)))
-    throw Error('Invalid or duplicate channel number');
-  return { ...radioCatalogue.save(input, id), editable: true };
+  const conflict = input.number != null && String(input.number).trim() !== '' ? channels.find(s => s.number === Number(input.number)) : null;
+  if (conflict)
+    throw Error(`Channel number ${input.number} is already assigned to ${conflict.name}`);
+  const station = radioCatalogue.save(input, id);
+  return { ...station, editable: true, original: radioCatalogue.originalIds.has(station.id) };
 });
 ipcMain.handle('delete-radio', (e, id) => {
   tvAuthorized(e);
@@ -1180,8 +1184,9 @@ ipcMain.handle('restore-radio', (e, token) => {
   const entry = deletedRadios.get(token);
   if (!entry)
     throw Error('Undo expired');
-  if (entry.station.number != null && channels.some(s => s.number === entry.station.number))
-    throw Error('Invalid or duplicate channel number');
+  const conflict = entry.station.number == null ? null : channels.find(s => s.number === entry.station.number);
+  if (conflict)
+    throw Error(`Channel number ${entry.station.number} is already assigned to ${conflict.name}`);
   const station = radioCatalogue.restore(entry.station, entry.index);
   const prefs = preferences.restoreRadio(station.id, entry.before);
   deletedRadios.delete(token);

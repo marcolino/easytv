@@ -1,1 +1,134 @@
-[]
+[
+  {
+    "id": "radio-rai1",
+    "name": "Rai Radio 1",
+    "url": "http://icestreaming.rai.it/1.mp3",
+    "logo": "https://www.google.com/s2/favicons?domain=www.raiplaysound.it&sz=128",
+    "homepage": "https://www.raiplaysound.it/",
+    "country": "IT",
+    "group": "Radio",
+    "favorite": true,
+    "number": 201
+  },
+  {
+    "id": "radio-rai2",
+    "name": "Rai Radio 2",
+    "url": "http://icestreaming.rai.it/2.mp3",
+    "logo": "https://www.google.com/s2/favicons?domain=www.raiplaysound.it&sz=128",
+    "homepage": "https://www.raiplaysound.it/",
+    "country": "IT",
+    "group": "Radio",
+    "favorite": true,
+    "number": 202
+  },
+  {
+    "id": "radio-rai3",
+    "name": "Rai Radio 3",
+    "url": "http://icestreaming.rai.it/3.mp3",
+    "logo": "https://www.google.com/s2/favicons?domain=www.raiplaysound.it&sz=128",
+    "homepage": "https://www.raiplaysound.it/",
+    "country": "IT",
+    "group": "Radio",
+    "favorite": true,
+    "number": 203
+  },
+  {
+    "id": "radio-subasio",
+    "name": "Radio Subasio",
+    "url": "https://icy.unitedradio.it/Subasio.mp3",
+    "logo": "https://www.google.com/s2/favicons?domain=www.radiosubasio.it&sz=128",
+    "homepage": "https://www.radiosubasio.it/",
+    "country": "IT",
+    "group": "Radio",
+    "favorite": true,
+    "number": 204
+  },
+  {
+    "id": "radio-105",
+    "name": "Radio 105",
+    "url": "https://icy.unitedradio.it/Radio105.mp3",
+    "logo": "https://www.google.com/s2/favicons?domain=www.105.net&sz=128",
+    "homepage": "https://www.105.net/",
+    "country": "IT",
+    "group": "Radio",
+    "favorite": true,
+    "number": 205
+  },
+  {
+    "id": "radio-rtl1025",
+    "name": "RTL 102.5",
+    "url": "https://streamingv2.shoutcast.com/rtl-1025",
+    "logo": "https://www.google.com/s2/favicons?domain=www.rtl.it&sz=128",
+    "homepage": "https://www.rtl.it/",
+    "country": "IT",
+    "group": "Radio",
+    "favorite": true,
+    "number": 206
+  },
+  {
+    "id": "radio-radioitalia",
+    "name": "Radio Italia solomusicaitaliana",
+    "url": "https://radioitaliasmi.akamaized.net/hls/live/2093120/RISMI/master.m3u8",
+    "logo": "https://www.google.com/s2/favicons?domain=www.radioitalia.it&sz=128",
+    "homepage": "https://www.radioitalia.it/",
+    "country": "IT",
+    "group": "Radio",
+    "favorite": true,
+    "number": 207
+  },
+  {
+    "id": "radio-rds",
+    "name": "RDS",
+    "url": "https://stream.rds.radio/audio/rds.stream_aac/playlist.m3u8",
+    "logo": "https://www.google.com/s2/favicons?domain=www.rds.it&sz=128",
+    "homepage": "https://www.rds.it/",
+    "country": "IT",
+    "group": "Radio",
+    "favorite": true,
+    "number": 208
+  },
+  {
+    "id": "radio-deejay",
+    "name": "Radio Deejay",
+    "url": "https://4c4b867c89244861ac216426883d1ad0.msvdn.net/radiodeejay/radiodeejay/master_ma.m3u8",
+    "logo": "https://www.google.com/s2/favicons?domain=www.deejay.it&sz=128",
+    "homepage": "https://www.deejay.it/",
+    "country": "IT",
+    "group": "Radio",
+    "favorite": true,
+    "number": 209
+  },
+  {
+    "id": "radio-kisskiss",
+    "name": "Radio Kiss Kiss",
+    "url": "https://ice08.fluidstream.net/KissKiss.aac",
+    "logo": "https://www.google.com/s2/favicons?domain=kisskiss.it&sz=128",
+    "homepage": "https://kisskiss.it/",
+    "country": "IT",
+    "group": "Radio",
+    "favorite": true,
+    "number": 210
+  },
+  {
+    "id": "radio-virgin",
+    "name": "Virgin Radio",
+    "url": "https://icy.unitedradio.it/Virgin.mp3",
+    "logo": "https://www.google.com/s2/favicons?domain=www.virginradio.it&sz=128",
+    "homepage": "https://www.virginradio.it/",
+    "country": "IT",
+    "group": "Radio",
+    "favorite": true,
+    "number": 211
+  },
+  {
+    "id": "radio-24",
+    "name": "Radio 24",
+    "url": "https://ilsole24ore-radio.akamaized.net/hls/live/2035301/radio24/playlist.m3u8",
+    "logo": "https://www.google.com/s2/favicons?domain=www.radio24.ilsole24ore.com&sz=128",
+    "homepage": "https://www.radio24.ilsole24ore.com/",
+    "country": "IT",
+    "group": "Radio",
+    "favorite": true,
+    "number": 224
+  }
+]

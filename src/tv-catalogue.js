@@ -22,8 +22,11 @@ function createTVCatalogue(app, originals, fetcher = globalThis.fetch) {
     if (!name || name.length > 120)
       throw Error('Invalid channel name');
     const number = input.number === '' || input.number == null ? null : Number(input.number);
-    if (number !== null && (!Number.isInteger(number) || number < 0 || number > 9999 || channels.some(c => c.id !== id && c.number === number)))
-      throw Error('Invalid or duplicate channel number');
+    if (number !== null && (!Number.isInteger(number) || number < 0 || number > 9999))
+      throw Error(`Invalid channel number for ${name}: ${input.number}`);
+    const conflict = number === null ? null : channels.find(c => c.id !== id && c.number === number);
+    if (conflict)
+      throw Error(`Channel number ${number} is already assigned to ${conflict.name}`);
     const directUrl = url(input.directUrl, false, true);
     const webUrl = url(input.url);
     if (!directUrl && !webUrl)

@@ -1,169 +1,121 @@
 # EasyTV
 
-EasyTV is a simple desktop application for watching live TV channels and listening to internet radio stations from your computer.
+EasyTV is a desktop launcher for live television, internet radio and subscription streaming services. Its fullscreen Home is designed for use on a television with a mouse, keyboard or keyboard-emulating remote control.
 
-It provides a fullscreen channel-selection window and opens the selected stream in a separate fullscreen window. Channels can be selected with the mouse, keyboard, or a suitably configured infrared remote control.
+![EasyTV screenshot](screenshots/easytv-v3.png)
 
-## Screenshots
-
-*A picture is worth a thousand words!* :-)
-
-![EasyTV v1 screenshot](screenshots/easytv-v2.png)
-
-## Features
-
-- Channel-selection interface with broadcaster logos and right-aligned channel numbers.
-- Conventional Italian TV channel numbering, including Rai News 24 (48).
-- Mouse selection and keyboard-based channel selection.
-- TV-style numeric entry with a 1.5-second timeout and Enter/OK confirmation.
-- Next/previous channel navigation and return-to-channel-list shortcuts.
-- Ready for infrared remotes whose USB receiver produces compatible keyboard events; physical IR hardware integration is not yet verified.
-- Fullscreen channel-selection window, F11 fullscreen toggle, and fullscreen streaming playback.
-- Optional system tray, disabled by default.
-- Application version and automatically incremented package build number.
-- Persistent browser session for streaming websites.
-- Widevine DRM support through Castlabs Electron.
-
-- Separate TV and radio favorites, configurable groups and drag-and-drop ordering.
-- Search IPTV-org and Radio Browser, with automatic delayed search, previews and manual station entry.
-- Direct HLS TV playback using hls.js, with optional fallback to the official web player.
-- Radio player with audio visualization where supported, and automatic reconnection.
-- Automatic logo lookup, manual logo search and preview.
-- English, Italian, French and German, with automatic system-language selection.
-- Undoable deletions and temporary toast notifications.
-
-## Supported platforms
+## Installation
 
 | Platform | Package | Status |
 |---|---|---|
 | Linux x64 | Debian `.deb` | Tested |
-| Windows x64 | NSIS `.exe` installer | Tested |
-| macOS ARM64 | `.dmg` / `.zip` | Experimental |
+| Windows x64 | NSIS `.exe` | Earlier builds tested |
+| macOS ARM64 | `.dmg` / `.zip` | Experimental; physical hardware and DRM unverified |
 
-**macOS note:** The macOS application has been successfully packaged, but it has not yet been tested on a physical Mac. Widevine DRM playback is not yet verified on macOS.
-
-## Installation
-
-### Linux
-
-Download the Debian package and install it (adjust the filename to the downloaded release):
+On Linux, install the downloaded package (adjust the filename as needed):
 
 ```bash
 sudo apt install ./easytv_1.0.0_amd64.deb
 ```
 
-Launch EasyTV from your applications menu.
+On Windows, run the installer. On macOS, experimental builds are unsigned and not notarized. See [BUILD.md](BUILD.md) for development and packaging instructions.
 
-### Windows
+## Using EasyTV
 
-Download and run the EasyTV Windows installer (`.exe`). Follow the installation instructions and launch EasyTV from the Start menu or desktop shortcut.
+Home displays favorites in configurable groups, with logos and optional numeric shortcuts. The last selected station can be restored on startup. Select a tile or enter its number to open a separate fullscreen playback window. The gear button opens Settings. OFF exits the application; operating-system shutdown is the responsibility of the kiosk environment.
 
-### macOS
+### Keyboard controls
 
-macOS builds are currently experimental and intended for testing on Apple Silicon (ARM64). The application is not yet signed or notarized, and compatibility with streaming services and DRM has not been verified on a physical Mac.
+| Key | Action |
+|---|---|
+| 0–9 | Enter a channel number; an OSD displays the digits |
+| Enter / OK | Confirm numeric entry |
+| Backspace | Delete the last pending digit, or recall the previous station |
+| Esc | Cancel numeric entry or return from ordinary streaming |
+| Home | Return from ordinary streaming to Home |
+| PageUp / PageDown | Previous/next navigation (TV numeric order or radio favorites; PageUp advances) |
+| Space | Play/pause in the radio player |
+| F2 | Open Settings |
+| F10 | Exit EasyTV; inside interactive web services, return to Home instead |
+| F11 | Toggle Home fullscreen |
 
-## Usage
+Numeric entry is confirmed after 1.5 seconds of inactivity, on Enter, or after four digits. TV, radio and services share optional unique numbers from 0 to 9999. Interactive web services receive normal typing, including digits, Backspace and Enter; press F10 to return to Home and press it again to exit EasyTV. Settings text fields are not channel-selection inputs.
 
-1. Launch EasyTV. The last selected station is restored when available; otherwise the fullscreen Home is shown.
-2. Click a channel, or enter its channel number using the keyboard.
-3. The stream opens in a separate fullscreen window.
-4. Press `Esc` while streaming to close the stream and return to channel selection.
-5. Press `F11` in the main window to toggle fullscreen; `Esc` exits main-window fullscreen.
+A programmable USB infrared receiver can emit these keyboard commands. Raw infrared integration and physical receiver compatibility are not verified.
 
-The channel-selection buttons remain clickable and keyboard-accessible. Their logos and labels cannot be accidentally selected by dragging if the renderer's selection-prevention styling is enabled.
+## Factory favorites
 
-### Channel numbers
+The following 25 entries are selected by default, in group order. Other factory entries remain in the catalogue without being favorites.
 
-| Number | Channel | Number | Channel |
-|---:|---|---:|---|
-| 1 | Rai 1 | 7 | LA7 |
-| 2 | Rai 2 | 8 | TV8 |
-| 3 | Rai 3 | 9 | NOVE |
-| 4 | Rete 4 | 48 | Rai News 24 |
-| 5 | Canale 5 | 51 | TGCOM24 |
-| 6 | Italia 1 | | |
+| Group | Channel | Number |
+|---|---|---:|
+| RAI | Rai 1 | 1 |
+| RAI | Rai 2 | 2 |
+| RAI | Rai 3 | 3 |
+| RAI | Rai News 24 | 48 |
+| Mediaset | Rete 4 | 4 |
+| Mediaset | Canale 5 | 5 |
+| Mediaset | Italia 1 | 6 |
+| Altri canali | LA7 | 7 |
+| Altri canali | TV8 | 8 |
+| Altri canali | NOVE | 9 |
+| Streaming | Netflix | 101 |
+| Streaming | Prime Video | 102 |
+| Streaming | YouTube | 108 |
+| Radio | Rai Radio 1 | 201 |
+| Radio | Rai Radio 2 | 202 |
+| Radio | Rai Radio 3 | 203 |
+| Radio | Radio Subasio | 204 |
+| Radio | Radio 105 | 205 |
+| Radio | RTL 102.5 | 206 |
+| Radio | Radio Italia solomusicaitaliana | 207 |
+| Radio | RDS | 208 |
+| Radio | Radio Deejay | 209 |
+| Radio | Radio Kiss Kiss | 210 |
+| Radio | Virgin Radio | 211 |
+| Radio | Radio 24 | 224 |
 
-Original numbers are defined in `src/config/tvs.json`; imported and manual TV channels may have a unique optional number. Numbers are independent of the order of the buttons on screen.
-
-### Keyboard and infrared-remote controls
-
-| Keyboard key | Typical remote button | Action |
-|---|---|---|
-| `0`–`9` | Number keys | Enter a channel number |
-| `Enter` | OK | Confirm the entered number immediately |
-| `Backspace` | Delete | Remove the last entered digit |
-| `Esc` | Back | Cancel pending numeric entry; otherwise close streaming |
-| `Home` | Home | Close streaming and return to the channel list |
-| `PageUp` | CH+ | Next available channel in numeric order |
-| `PageDown` | CH− | Previous available channel in numeric order |
-| `F2` | — | Open settings |
-| `F10` | — | Off / exit |
-| `F11` (main window) | — | Toggle main-window fullscreen |
-
-Numeric entry waits **1.5 seconds** after the last digit unless confirmed with `Enter`. For example, `4`, `8` selects Rai News 24. CH+/CH− wrap around at the ends of the channel list.
-
-**Infrared hardware:** EasyTV currently handles keyboard events, not raw infrared signals. A programmable USB IR receiver (such as a keyboard-emulating receiver) can be configured to send the keys above. Other receivers may require Linux `rc-core`/LIRC configuration or additional mapping. The receiver must deliver input to an EasyTV window; system-wide remote control is not implemented. Physical IR-device testing is pending.
-
-### Optional system tray
-
-The system tray is **disabled by default**. Closing all EasyTV windows normally exits the application.
-
-On Linux, when launching from a terminal, enable the tray with:
-
-```bash
-EASYTV_TRAY=1 npm start
-```
-
-When enabled, the tray offers **Apri EasyTV**, **Chiudi streaming**, and **Esci**. Closing all windows then leaves EasyTV running in the tray. The environment variable is a development/launch configuration; a packaged-app settings interface has not yet been added.
+TGCOM24 (51), Disney+, Apple TV, DAZN, NOW and Paramount+ are also included in the factory catalogue. Numbers and favorites can differ in existing profiles. Factory defaults are not a guarantee of stream availability.
 
 ## Settings and catalogues
 
-Open Settings with F2 or the gear button. Search by station name, country and category/genre, or add a station manually using its stream URL. Preview before adding to favorites. Imported stations are retained locally; catalogue availability does not guarantee playback. Use the pencil to edit a custom station and the red trash button to delete it. Deletions can be undone using the toast for seven seconds. Save favorites, group and language changes using the settings toolbar.
+- Search IPTV-org for TV and Radio Browser for radio; preview results before importing. Search is delayed as you type and results are paginated.
+- Use the plus button to add an entry manually. TV requires a name and at least one URL (direct stream or official web player); radio requires a name and audio stream URL. Numbers are optional; the number field has no suggested placeholder.
+- The star toggles favorites. Drag handles reorder entries and groups. Group accordions expose membership and visibility controls; opening an accordion closes other open accordions. Save or cancel group edits to close it.
+- The catalogue shows small numeric keycaps beneath station names. Play previews a station; the pencil edits it; the trash button removes custom entries. Protected controls explain their limitations. Factory TV channels are protected, factory radio entries can be edited, and factory service numbers can be edited. Factory entries can be removed from favorites without deleting them.
+- Duplicate-number errors identify the station occupying the number; invalid-number errors identify the station being edited. Deletions and supported other actions offer a temporary Undo toast.
+- Choose English, Italian, French or German in General. Initial language detection uses the system language.
 
-For TV channels with both playback methods, choose **Web**, **Direct** or **Auto**. Auto tries direct playback first and falls back to the official player after recovery attempts fail; it does not detect lip-sync problems. Direct-only stations have no web fallback. The radio spectrum depends on browser audio-analysis compatibility.
+### Logos
 
-On Linux, preferences and catalogues normally reside in `~/.config/easytv/`: `settings.json`, `tv-catalogue.json`, `radio-catalogue.json` and `logo-cache.json`. Stream URLs may expire or be restricted. Use only streams you are authorized to access.
+Logo search uses external sources including Wikidata/Wikimedia Commons, Radio Browser and known radio defaults. Manual search bypasses the cache and excludes the current logo URL. If an alternative is found, a toast offers Undo for seven seconds. Save the station to persist the replacement. Different URLs may still represent the same image; logos are not compared visually. If no alternative is found, the existing logo is retained.
 
-## Streaming and DRM
+### Playback modes
 
-Streaming availability and playback quality depend on the broadcaster's website, network connection, and regional restrictions.
+Direct is the default when a direct stream URL is available; otherwise Web is used. Explicit playback choices are saved. Older profiles did not store Web choices explicitly, so those entries now follow the new default.
 
-Some channels use Widevine DRM. EasyTV uses a Castlabs Electron build with Widevine support. Successful playback may depend on the operating system, browser components, advertisements, and broadcaster changes.
+| Mode | Behavior |
+|---|---|
+| Web | Opens the official broadcaster player |
+| Direct | Plays the supplied stream, including HLS through hls.js |
+| Auto | Tries direct playback and falls back to the official player after recovery fails |
 
-The latest catalogue and player changes have been exercised on Linux; the earlier Windows packaging/playback tests do not establish that every new feature works on Windows or macOS.
+Only applicable modes are available for each channel. Radio supports ordinary audio streams and HLS, with reconnection and audio visualization where supported. Auto does not diagnose audio/video synchronization issues.
 
-## Support and development
+## Streaming services and DRM
 
-For installation details, build numbering, build instructions, and development information, see [BUILD.md](BUILD.md).
+Netflix, Prime Video, Disney+, Apple TV, DAZN, NOW, Paramount+ and YouTube open their official websites. Sign in using the website itself; EasyTV does not collect account passwords. Browser sessions persist in the active profile. A valid subscription may be required. EasyTV uses Castlabs Electron with Widevine support and does not bypass authentication, DRM or regional restrictions.
 
-Project repository: https://github.com/marcolino/easytv
+Netflix login and playback have been confirmed in the Linux development environment. Other services require individual testing. Rai 4 works via its official RaiPlay page; Rai Storia can play fullscreen after a manual Play click, but automatic startup has not been confirmed fixed. Tested alternative Mediapolis URLs returned access errors. Do not assume that every catalogue stream or logo works on every platform.
 
-## Development profile
+## Profiles, backup and reset
 
-Unpackaged launches use `~/.config/easytv-dev/` on Linux, while installed builds use `~/.config/easytv/`. Each profile has independent preferences, catalogues, logo cache and browser sessions. Existing production preferences are preserved.
+On Linux, development launches use `~/.config/easytv-dev/` and installed builds use `~/.config/easytv/`. Each has independent settings, catalogues, logo cache and browser sessions. Ordinary updates preserve saved preferences, although new factory entries may be merged into existing catalogues.
 
-### Restore default settings
+Restore default configuration (at the bottom of Settings) asks for confirmation, backs up the active profile JSON files into `reset-backup-*`, and restarts EasyTV. It resets favorites, groups, custom entries, playback preferences, language and last station. Browser cookies and DRM data are retained. To restore a backup, close EasyTV and copy its saved JSON files back into the active profile. The other profile is not affected.
 
-The button at the bottom of Settings resets only the active profile after confirmation and restarts EasyTV. Custom catalogues, favorites, groups, playback modes, language preferences, last station and logo cache are reset. Browser cookies and DRM data are retained. Previous JSON files are moved to a unique `reset-backup-*` directory inside the active profile. To restore them, close EasyTV and copy the saved JSON files back to that profile, replacing the current files as needed. The other profile and packaged default catalogues are not changed.
+The optional system tray is disabled by default. To enable it for a development launch, use `EASYTV_TRAY=1 npm start`. Closing windows may then leave the application running; OFF/F10 on Home explicitly quits.
 
-## Playback controls and translation overrides
+## Development and support
 
-OFF / F10 exits EasyTV; kiosk shutdown is managed externally. Backspace recalls the previous station when no numeric entry is pending. Numeric entry shows an on-screen display where the playback surface permits it.
-
-Approved translations belong in `src/locales/translation-overrides.json`. Run `npm run i18n:sync` to apply them without network requests. Builds do not translate automatically.
-
-## Settings and numeric selection
-
-TV and radio share optional unique numeric shortcuts (0–9999). Assign radio numbers in the station editor, for example 105 for Radio 105. Enter confirms immediately; otherwise selection follows the 1.5-second timeout (or four digits). The language selector lists the four supported languages; initial language detection remains automatic.
-
-Use `npm run i18n:sort` to sort translation keys without changing values. Synchronization, pruning and translation also write sorted dictionaries.
-
-## Interface typography
-
-EasyTV uses locally installed Open Sans font assets for its own interface, with system-font fallbacks. The channel-name banner retains its distinct rounded typography. Broadcaster websites control their own fonts.
-
-### Manual TV channels
-
-Provide a name and at least one URL: a direct stream or an HTTPS official player page. Both URLs enable automatic fallback. Original stations can be previewed; their edit and delete controls explain why those operations are unavailable. Remove original stations from favorites instead.
-
-For interactive web services, F10 returns to EasyTV Home; a separate second press exits EasyTV. Groups can be expanded individually and reordered using their drag handles.
+See [BUILD.md](BUILD.md). Repository: https://github.com/marcolino/easytv

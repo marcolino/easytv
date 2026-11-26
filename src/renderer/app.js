@@ -20,12 +20,12 @@ function notify(text, type = 'success') {
     }, { success: 2500, info: 3000, warning: 4000, error: 6000 }[type] || 3000);
 }
 
-function undoToast(text, action) {
+function undoToast(text, action, undoLabel = t('Undo deletion')) {
   const stack = document.getElementById('undo-stack');
   const card = element('div', 'undo-toast');
   const label = element('span', '', text);
   label.setAttribute('role', 'status');
-  const undo = button(t('Undo deletion'), async () => {
+  const undo = button(undoLabel, async () => {
     undo.disabled = true;
     try {
       await action();
@@ -491,7 +491,15 @@ function renderCatalogue(type, catalogue) {
       });
       item.append(handle);
     }
-    item.append(star, element('span', 'catalogue-name', station.name));
+    const name = element('span', 'catalogue-name');
+    name.append(element('span', 'catalogue-label', station.name));
+    if (station.number != null && String(station.number) !== '') {
+      const keys = element('span', 'channel-number');
+      for (const digit of String(station.number))
+        keys.append(element('kbd', 'channel-key', digit));
+      name.append(keys);
+    }
+    item.append(star, name);
     if (type === 'tv') {
       const select = element('select', 'tv-playback-mode');
       select.setAttribute('aria-label', t('Playback mode') + ': ' + station.name);
@@ -503,17 +511,14 @@ function renderCatalogue(type, catalogue) {
         option.title = description;
         select.append(option);
       }
-      const preferred = draft.tvPlayback?.[station.id] || 'web';
+      const preferred = draft.tvPlayback?.[station.id] || (station.directUrl ? 'direct' : 'web');
       select.value = [...select.options].some(option => option.value === preferred) ? preferred : select.options[0]?.value || '';
       select.disabled = select.options.length <= 1;
       select.title = select.selectedOptions[0]?.title || t('Playback mode');
       select.onchange = () => {
         select.title = select.selectedOptions[0].title;
         draft.tvPlayback ||= {};
-        if (select.value === 'web')
-          delete draft.tvPlayback[station.id];
-        else
-          draft.tvPlayback[station.id] = select.value;
+        draft.tvPlayback[station.id] = select.value;
         updateToolbar();
       };
       item.append(select);
@@ -531,7 +536,7 @@ function renderCatalogue(type, catalogue) {
       item.append(
         tvIconButton('play', t('Preview'), () => window.easyTV.openRadio(station.id, true)),
         tvIconButton('edit', t('Edit station'), () => editRadio(station), false, station.editable ? '' : protectedReason),
-        tvIconButton('trash', t('Delete station'), () => deleteRadio(station), true, station.editable ? '' : protectedReason)
+        tvIconButton('trash', t('Delete station'), () => deleteRadio(station), true, station.editable && !station.original ? '' : protectedReason)
       );
     }
     holder.append(item);
@@ -911,7 +916,7 @@ async function initialize() {
   ]);
   tvs = channels;
   radios = await window.easyTV.getRadios();
-  suggestRadioNumber();
+
   document.getElementById('radio-clear').addEventListener('click', clearRadioSearch);
   document.getElementById('radio-search').addEventListener('click', () => searchRadio());
   document.getElementById('radio-more').addEventListener('click', () => searchRadio(true));
@@ -1270,16 +1275,10 @@ function setupTV() {
 let manualRadioId = null;
 const manualRadioFields = ['name', 'url', 'number', 'logo', 'country', 'genre', 'frequency', 'homepage'];
 
-function suggestRadioNumber() {
-  const used = new Set([...tvs, ...radios].filter(s => s.number != null && s.number !== '').map(s => Number(s.number)));
-  let number = 101;
-  while (number <= 9999 && used.has(number))
-    number++;
-  tvEl('manual-radio-number').placeholder = number <= 9999 ? String(number) : '';
-}
+
 
 function editRadio(station = null) {
-  suggestRadioNumber();
+
   manualRadioId = station?.id || null;
   for (const k of manualRadioFields)
     tvEl('manual-radio-' + k).value = station?.[k] ?? '';
@@ -1451,6 +1450,8 @@ function setupLogoSearch() {
     field.addEventListener('input', () => updateLogoPreview(kind));
     b.onclick = async () => {
       const value = name.value.trim(), old = field.value, d = draft, id = kind === 'tv' ? manualId : manualRadioId;
+      if (field.readOnly)
+        return;
       if (!value) {
         notify(t('Station name required'), 'warning');
         return;
@@ -1460,13 +1461,22 @@ function setupLogoSearch() {
         const url = await window.easyTV.findStationLogo({ name: value, logo: old, country: kind === 'radio' ? tvEl(prefix + 'country').value : 'IT' }, kind, true);
         if (draft !== d || name.value.trim() !== value || field.value !== old || id !== (kind === 'tv' ? manualId : manualRadioId))
           return;
-        if (url) {
+        if (url && url !== old.trim()) {
           field.value = url;
           updateLogoPreview(kind);
-          notify(t('Logo found.'));
+          if (old.trim()) {
+            undoToast(t('Logo of {name} replaced.', { name: value }), () => {
+              if (draft !== d || name.value.trim() !== value || field.value !== url || id !== (kind === 'tv' ? manualId : manualRadioId))
+                throw Error(t('Settings session ended.'));
+              field.value = old;
+              updateLogoPreview(kind);
+            }, t('Cancel'));
+          }
+          else
+            notify(t('Logo found.'));
         }
         else
-          notify(t('No logo found.'), 'warning');
+          notify(old.trim() ? t('No alternative logo found.') : t('No logo found.'), 'warning');
       }
       catch (e) {
         tvError(e);
@@ -1503,8 +1513,7 @@ for (const kind of ['tv', 'radio']) {
         toggle.setAttribute('aria-expanded', String(!!value));
         if (value) {
           closeOtherAccordions(panel);
-          if (panel.id === "manual-radio-panel")
-            suggestRadioNumber();
+
         }
       }
     });

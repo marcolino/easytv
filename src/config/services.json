@@ -6,7 +6,8 @@
     "group": "STREAMING",
     "service": true,
     "number": 101,
-    "logo": "https://cdn.simpleicons.org/netflix/E50914"
+    "logo": "https://cdn.simpleicons.org/netflix/E50914",
+    "favorite": true
   },
   {
     "id": "service-prime-video",
@@ -15,7 +16,8 @@
     "group": "STREAMING",
     "service": true,
     "number": 102,
-    "logo": "https://www.google.com/s2/favicons?domain=www.primevideo.com&sz=128"
+    "logo": "https://www.google.com/s2/favicons?domain=www.primevideo.com&sz=128",
+    "favorite": true
   },
   {
     "id": "service-disney-plus",
@@ -23,8 +25,9 @@
     "url": "https://www.disneyplus.com/",
     "group": "STREAMING",
     "service": true,
-    "number": 103,
-    "logo": "https://www.google.com/s2/favicons?domain=www.disneyplus.com&sz=128"
+    "number": null,
+    "logo": "https://www.google.com/s2/favicons?domain=www.disneyplus.com&sz=128",
+    "favorite": false
   },
   {
     "id": "service-apple-tv",
@@ -32,8 +35,9 @@
     "url": "https://tv.apple.com/",
     "group": "STREAMING",
     "service": true,
-    "number": 104,
-    "logo": "https://cdn.simpleicons.org/apple/FFFFFF"
+    "number": null,
+    "logo": "https://cdn.simpleicons.org/apple/FFFFFF",
+    "favorite": false
   },
   {
     "id": "service-dazn",
@@ -41,8 +45,9 @@
     "url": "https://www.dazn.com/",
     "group": "STREAMING",
     "service": true,
-    "number": 105,
-    "logo": "https://cdn.simpleicons.org/dazn/FFFFFF"
+    "number": null,
+    "logo": "https://cdn.simpleicons.org/dazn/FFFFFF",
+    "favorite": false
   },
   {
     "id": "service-now",
@@ -50,8 +55,9 @@
     "url": "https://www.nowtv.it/",
     "group": "STREAMING",
     "service": true,
-    "number": 106,
-    "logo": "https://www.google.com/s2/favicons?domain=www.nowtv.it&sz=128"
+    "number": null,
+    "logo": "https://www.google.com/s2/favicons?domain=www.nowtv.it&sz=128",
+    "favorite": false
   },
   {
     "id": "service-paramount-plus",
@@ -59,8 +65,9 @@
     "url": "https://www.paramountplus.com/it/",
     "group": "STREAMING",
     "service": true,
-    "number": 107,
-    "logo": "https://www.google.com/s2/favicons?domain=www.paramountplus.com&sz=128"
+    "number": null,
+    "logo": "https://www.google.com/s2/favicons?domain=www.paramountplus.com&sz=128",
+    "favorite": false
   },
   {
     "id": "service-youtube",
@@ -69,6 +76,7 @@
     "group": "STREAMING",
     "service": true,
     "number": 108,
-    "logo": "https://cdn.simpleicons.org/youtube/FF0000"
+    "logo": "https://cdn.simpleicons.org/youtube/FF0000",
+    "favorite": true
   }
 ]

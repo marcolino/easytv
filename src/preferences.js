@@ -10,12 +10,12 @@ function createPreferences(app, tvs, radios) {
     language: 'auto',
     tvPlayback: {},
     lastStation: null,
-    favorites: { tv: tvs.filter(x => !x.source).map(x => x.id), radio: radios.filter(x => x.favorite === true).map(x => x.id) },
+    favorites: { tv: tvs.filter(x => !x.source && x.favorite !== false).map(x => x.id), radio: radios.filter(x => x.favorite === true).map(x => x.id) },
     groups: [
       { id: 'rai', name: 'RAI', type: 'tv', visible: true, stationIds: tvs.filter(x => x.group === 'RAI').map(x => x.id) },
       { id: 'mediaset', name: 'Mediaset', type: 'tv', visible: true, stationIds: tvs.filter(x => x.group === 'MEDIASET').map(x => x.id) },
-      { id: 'streaming', name: 'Streaming', type: 'tv', visible: true, stationIds: tvs.filter(x => x.service).map(x => x.id) },
-      { id: 'altri', name: 'Altri canali', type: 'tv', visible: true, stationIds: tvs.filter(x => x.group === 'ALTRI').map(x => x.id) }
+      { id: 'altri', name: 'Altri canali', type: 'tv', visible: true, stationIds: tvs.filter(x => x.group === 'ALTRI').map(x => x.id) },
+      { id: 'streaming', name: 'Streaming', type: 'tv', visible: true, stationIds: tvs.filter(x => x.service).map(x => x.id) }
     ]
   };
   for (const name of new Set(radios.map(r => r.group || 'Radio')))
@@ -54,7 +54,7 @@ function createPreferences(app, tvs, radios) {
       }
       for (const station of newServices) {
         if (!group.stationIds.includes(station.id)) group.stationIds.push(station.id);
-        if (!data.favorites.tv.includes(station.id)) data.favorites.tv.push(station.id);
+        if (station.favorite !== false && !data.favorites.tv.includes(station.id)) data.favorites.tv.push(station.id);
       }
     }
     for (const station of tvs) {
@@ -116,7 +116,9 @@ function createPreferences(app, tvs, radios) {
     const tvPlayback = {};
     for (const station of tvs) {
       const mode = value.tvPlayback?.[station.id];
-      if (station.directUrl && ['direct', 'auto'].includes(mode))
+      if ((mode === 'web' && station.url) ||
+        (mode === 'direct' && station.directUrl) ||
+        (mode === 'auto' && station.url && station.directUrl))
         tvPlayback[station.id] = mode;
     }
     return { tvPlayback, language: ['auto', 'en', 'it', 'fr', 'de'].includes(value.language) ? value.language : 'auto', lastStation: validLast, favorites, groups, knownTvIds: tvs.map(x => x.id) };

@@ -33,7 +33,7 @@
     logo.src = /^https?:\/\//i.test(station.logo) ? station.logo : `../../assets/icons/${station.logo}`;
   else
     recoverLogo();
-  let audio, context, analyser, retry, generation = 0, wanted = true, cors = true;
+  let audio, hls, context, analyser, retry, generation = 0, wanted = true, cors = true;
   const canvas = $('wave'), ctx = canvas.getContext('2d');
 
   function draw() {
@@ -58,6 +58,10 @@
   function stop() {
     generation++;
     clearTimeout(retry);
+    if (hls) {
+      hls.destroy();
+      hls = null;
+    }
     if (audio) {
       audio.pause();
       audio.removeAttribute('src');
@@ -77,7 +81,7 @@
     audio = new Audio();
     if (cors)
       audio.crossOrigin = 'anonymous';
-    audio.src = station.url;
+
     status(t('Connecting to radio station...'));
     const fail = () => {
       if (token !== generation || !wanted)
@@ -114,7 +118,17 @@
         return;
       }
     }
-    audio.play().catch(fail);
+    if (/\.m3u8(?:$|[?#])/i.test(station.url) && window.Hls?.isSupported()) {
+      hls = new window.Hls();
+      hls.on(window.Hls.Events.ERROR, (_, data) => { if (data.fatal) fail(); });
+      hls.on(window.Hls.Events.MANIFEST_PARSED, () => { if (token === generation) audio.play().catch(fail); });
+      hls.attachMedia(audio);
+      hls.loadSource(station.url);
+    }
+    else {
+      audio.src = station.url;
+      audio.play().catch(fail);
+    }
   }
 
   function toggle() {
