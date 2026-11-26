@@ -1030,6 +1030,47 @@ ipcMain.on('preview-language', (event, language) => {
 });
 ipcMain.handle('get-preferences', () => preferences.get());
 ipcMain.handle('save-preferences', (_event, data) => preferences.update(data));
+const configTransfer = require('./config-transfer');
+
+ipcMain.handle('export-configuration', event => {
+  tvAuthorized(event);
+  if (!settingsScreenOpen) throw Error('Settings must be open');
+  const file = dialog.showSaveDialogSync(mainWindow, {
+    title: t('Export configuration'),
+    defaultPath: path.join(app.getPath('documents'), `EasyTV-config-${new Date().toISOString().slice(0, 10)}.json`),
+    filters: [{ name: 'JSON', extensions: ['json'] }]
+  });
+  if (!file) return false;
+  const data = configTransfer.exportConfig(app.getPath('userData'), preferences.get());
+  fs.writeFileSync(file, JSON.stringify(data, null, 2) + '\n', { mode: 0o600 });
+  return true;
+});
+
+ipcMain.handle('import-configuration', event => {
+  tvAuthorized(event);
+  if (!settingsScreenOpen) throw Error('Settings must be open');
+  const files = dialog.showOpenDialogSync(mainWindow, {
+    title: t('Import configuration'), properties: ['openFile'],
+    filters: [{ name: 'JSON', extensions: ['json'] }]
+  });
+  if (!files?.length) return false;
+  const data = configTransfer.validateConfig(configTransfer.readConfig(files[0]),
+    [...require('./config/tvs.json'), ...require('./config/services.json')], require('./config/radios.json'));
+  const answer = dialog.showMessageBoxSync(mainWindow, {
+    type: 'warning', title: t('Import configuration'),
+    message: t('Replace the current configuration?'),
+    detail: t('TV favorites: {tv}. Radio favorites: {radio}. Groups: {groups}. A backup will be kept. EasyTV will restart.', {
+      tv: data.preferences.favorites.tv.length, radio: data.preferences.favorites.radio.length, groups: data.preferences.groups.length
+    }),
+    buttons: [t('Cancel'), t('Import configuration')], defaultId: 0, cancelId: 0, noLink: true
+  });
+  if (answer !== 1) return false;
+  configTransfer.importConfig(app.getPath('userData'), data);
+  app.relaunch();
+  app.exit(0);
+  return true;
+});
+
 ipcMain.handle('reset-profile', async event => {
   tvAuthorized(event);
   if (!settingsScreenOpen)

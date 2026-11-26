@@ -134,6 +134,7 @@ function createPreferences(app, tvs, radios) {
     return structuredClone(data);
   }
   return {
+    validate,
     get: () => structuredClone(data),
     update: next => write({ ...next, lastStation: data.lastStation }),
     forgetRadio: id => {

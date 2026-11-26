@@ -947,6 +947,24 @@ async function initialize() {
   document.getElementById('add-tv-group').addEventListener('click', () => addGroup('tv'));
   document.getElementById('add-radio-group').addEventListener('click', () => addGroup('radio'));
   save.addEventListener('click', saveSettings);
+  for (const [id, action] of [['export-configuration', 'exportConfiguration'], ['import-configuration', 'importConfiguration']]) {
+    document.getElementById(id).addEventListener('click', async () => {
+      if (saving) return;
+      saving = true;
+      page.inert = true;
+      try {
+        if (await window.easyTV[action]() && action === 'exportConfiguration')
+          notify(t('Configuration exported.'));
+      }
+      catch (error) {
+        notify(t('Error: {message}', { message: error.message }), 'error');
+      }
+      finally {
+        saving = false;
+        page.inert = false;
+      }
+    });
+  }
   const reset = document.getElementById('reset-profile');
   reset.addEventListener('click', async () => {
     if (saving)

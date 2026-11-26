@@ -6,7 +6,63 @@
   const lang = prefs.language === 'auto' ? locale.systemLanguage : prefs.language;
   const t = key => locale.dictionaries[lang]?.[key] || key;
   const video = $('video');
+  const frame = $('last-frame'), spinner = $('loading-spinner');
+  const frameContext = frame.getContext('2d');
+  let hasFrame = false;
   let connecting = true;
+  let buffering = false;
+  let bufferingTimer;
+
+  function rememberFrame() {
+    if (connecting || failed || video.paused || video.readyState < 2 || !video.videoWidth || !frameContext)
+      return;
+    try {
+      const scale = Math.min(1, 1280 / video.videoWidth);
+      const width = Math.round(video.videoWidth * scale);
+      const height = Math.round(video.videoHeight * scale);
+      if (frame.width !== width || frame.height !== height) {
+        frame.width = width;
+        frame.height = height;
+      }
+      frameContext.drawImage(video, 0, 0, width, height);
+      hasFrame = true;
+    }
+    catch {
+      // A frame may not be accessible on every platform.
+    }
+  }
+
+  function showLoading() {
+    frame.hidden = !hasFrame;
+    spinner.hidden = false;
+  }
+
+  function clearBuffering() {
+    clearTimeout(bufferingTimer);
+    bufferingTimer = undefined;
+    buffering = false;
+  }
+
+  function showBuffering() {
+    if (connecting || failed || video.paused || buffering)
+      return;
+    buffering = true;
+    // Keep the native frozen video visible until an actual reconnect.
+    spinner.hidden = false;
+  }
+
+  function scheduleBuffering() {
+    if (connecting || failed || buffering || bufferingTimer !== undefined)
+      return;
+    bufferingTimer = setTimeout(() => {
+      bufferingTimer = undefined;
+      showBuffering();
+    }, 1000);
+  }
+
+  video.addEventListener('waiting', scheduleBuffering);
+
+  const frameTimer = setInterval(rememberFrame, 500);
   let hls, timer, lastProgress = Date.now(), lastTime = -1, attempts = 0, failed = false, retryTimer, generation = 0;
   $('name').textContent = info.channel.name;
   $('web').textContent = t('Official player');
@@ -38,6 +94,7 @@
     document.addEventListener(event, reveal);
 
   function stop() {
+    clearBuffering();
     generation++;
     clearTimeout(retryTimer);
     if (hls) {
@@ -52,7 +109,9 @@
   function fail(reason) {
     if (failed)
       return;
+    rememberFrame();
     failed = true;
+    showLoading();
     console.warn('Direct TV:', reason);
     stop();
     $('status').textContent = t('Reconnecting...');
@@ -61,6 +120,7 @@
       retryTimer = setTimeout(start, 3000);
       return;
     }
+    spinner.hidden = true;
     if (info.mode === 'auto') {
       api.directTVWeb();
       return;
@@ -73,6 +133,7 @@
     stop();
     failed = false;
     connecting = true;
+    showLoading();
     $('web').disabled = $('retry').disabled = true;
     lastProgress = Date.now();
     lastTime = -1;
@@ -97,6 +158,10 @@
   }
   video.addEventListener('playing', () => {
     connecting = false;
+    clearBuffering();
+    frame.hidden = true;
+    spinner.hidden = true;
+    rememberFrame();
     $('status').textContent = t('Live TV');
     clearTimeout(timer);
     $('overlay').classList.add('hidden');
@@ -128,12 +193,19 @@
     if (video.currentTime !== lastTime) {
       lastTime = video.currentTime;
       lastProgress = Date.now();
+      if (!connecting) {
+        clearBuffering();
+        spinner.hidden = true;
+      }
     }
     else if (Date.now() - lastProgress > 20000)
       fail('No playback progress');
-  }, 1000);
+    else if (Date.now() - lastProgress >= 1000)
+      showBuffering();
+  }, 250);
   window.addEventListener('pagehide', () => {
     clearInterval(watchdog);
+    clearInterval(frameTimer);
     clearTimeout(timer);
     stop();
   });

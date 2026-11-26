@@ -34,17 +34,27 @@ function createTVCatalogue(app, originals, fetcher = globalThis.fetch) {
     return { id, name, number, directUrl, url: webUrl, logo: url(input.logo), source };
   }
   try {
-    for (const item of JSON.parse(fs.readFileSync(file, 'utf8'))) {
-      const service = channels.find(c => c.id === item.id && c.service);
-      if (service) {
-        try {
-          service.number = clean({ ...service, number: item.number }, service.id, undefined).number;
-        }
-        catch (e) {
-          console.warn('Service number:', e.message);
-        }
-        continue;
+    const saved = JSON.parse(fs.readFileSync(file, 'utf8'));
+    // Apply service overrides together before checking the effective numbers.
+    const overrides = new Map(saved.filter(item => channels.some(c => c.service && c.id === item.id)).map(item => [item.id, item]));
+    for (const service of channels.filter(c => c.service && overrides.has(c.id))) {
+      const number = overrides.get(service.id).number;
+      if (number === null || (Number.isInteger(number) && number >= 0 && number <= 9999))
+        service.number = number;
+      else
+        console.warn('Service number: Invalid channel number for ' + service.name);
+    }
+    const occupied = new Map();
+    for (const channel of channels) {
+      if (channel.number == null) continue;
+      if (occupied.has(channel.number)) {
+        console.warn(`Channel number ${channel.number} is already assigned to ${occupied.get(channel.number)}`);
+        channel.number = null;
       }
+      else occupied.set(channel.number, channel.name);
+    }
+    for (const item of saved) {
+      if (overrides.has(item.id)) continue;
       if (!/^custom-[a-f0-9-]+$/.test(item.id) || channels.some(c => c.id === item.id))
         continue;
       try {
@@ -62,7 +72,7 @@ function createTVCatalogue(app, originals, fetcher = globalThis.fetch) {
 
   function commit(next) {
     fs.mkdirSync(path.dirname(file), { recursive: true });
-    fs.writeFileSync(file + '.tmp', JSON.stringify(next.filter(c => !originalIds.has(c.id) || (c.service && c.number != null)).map(c => originalIds.has(c.id) ? { id: c.id, number: c.number } : c), null, 2) + '\n', { mode: 0o600 });
+    fs.writeFileSync(file + '.tmp', JSON.stringify(next.filter(c => !originalIds.has(c.id) || (c.service && (c.number ?? null) !== (originals.find(o => o.id === c.id).number ?? null))).map(c => originalIds.has(c.id) ? { id: c.id, number: c.number ?? null } : c), null, 2) + '\n', { mode: 0o600 });
     fs.renameSync(file + '.tmp', file);
     channels.splice(0, channels.length, ...next);
   }

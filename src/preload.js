@@ -26,6 +26,8 @@ contextBridge.exposeInMainWorld('easyTV', {
   getPreferences: () => ipcRenderer.invoke('get-preferences'),
   savePreferences: data => ipcRenderer.invoke('save-preferences', data),
   openChannel: id => ipcRenderer.invoke('open-channel', id),
+  exportConfiguration: () => ipcRenderer.invoke('export-configuration'),
+  importConfiguration: () => ipcRenderer.invoke('import-configuration'),
   resetProfile: () => ipcRenderer.invoke('reset-profile'),
   requestPowerOff: () => ipcRenderer.invoke('request-power-off'),
   setSettingsScreenOpen: open => ipcRenderer.send('settings-screen-state', open),

@@ -636,8 +636,13 @@ button:focus-visible, input:focus-visible {
   border-top: 1px solid #303641;
   margin-top: 24px;
   padding: 16px 0;
+  display: block;
+}
+
+.configuration-actions {
   display: flex;
-  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
 #reset-profile {
