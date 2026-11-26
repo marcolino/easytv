@@ -79,11 +79,29 @@ jobs:
       - name: Verify packaged architecture
         run: |
           set -e
-          bundle=$(find dist -type d -name EasyTV.app -print -quit)
-          test -n "$bundle"
+          bundle=$(find dist -maxdepth 2 -type d -iname '*.app' -print -quit)
+          if [ -z "$bundle" ]; then
+            echo '::error::No packaged application bundle found'
+            ls -la dist
+            exit 1
+          fi
+          echo "Application bundle: $bundle"
           executable=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$bundle/Contents/Info.plist")
           binary="$bundle/Contents/MacOS/$executable"
-          lipo -verify_arch ${{ matrix.arch }} "$binary"
+          echo "Executable: $binary"
+          file "$binary"
+          lipo -info "$binary"
+          if ! lipo -verify_arch ${{ matrix.arch }} "$binary"; then
+            echo '::error::Packaged executable has unexpected architecture'
+            exit 1
+          fi
+
+      - name: Label installers by architecture
+        run: |
+          for installer in dist/*.dmg dist/*.zip; do
+            test -f "$installer" || continue
+            mv "$installer" "${installer%.*}-${{ matrix.arch }}.${installer##*.}"
+          done
 
       - name: Upload installers
         uses: actions/upload-artifact@v7
