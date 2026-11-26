@@ -1,0 +1,106 @@
+name: Build release packages
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.platform }} ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {platform: linux, arch: x64, runner: ubuntu-24.04, args: '--linux deb AppImage --x64'}
+          - {platform: windows, arch: x64, runner: windows-2025, args: '--win nsis --x64'}
+          - {platform: macos, arch: arm64, runner: macos-15, args: '--mac --arm64'}
+          - {platform: macos, arch: x64, runner: macos-15-intel, args: '--mac --x64'}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - name: Configure GitHub HTTPS access
+        run: |
+          git config --global url."https://github.com/".insteadOf "ssh://git@github.com/"
+          git config --global --add url."https://github.com/".insteadOf "git@github.com:"
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Validate source and tag
+        run: |
+          npm run check
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            version=$(node -p "require('./package.json').version")
+            test "$GITHUB_REF_NAME" = "v$version" || { echo 'Tag must match package.json version'; exit 1; }
+          fi
+      - name: Generate macOS application icon
+        if: runner.os == 'macOS'
+        run: |
+          set -e
+          SOURCE="assets/logos/easytv-512.png"
+          ICONSET="assets/logos/easytv.iconset"
+          test -f "$SOURCE"
+          mkdir -p "$ICONSET"
+          for size in 16 32 128 256 512; do
+            sips -z "$size" "$size" "$SOURCE" --out "$ICONSET/icon_${size}x${size}.png"
+            double=$((size * 2))
+            sips -z "$double" "$double" "$SOURCE" --out "$ICONSET/icon_${size}x${size}@2x.png"
+          done
+          iconutil -c icns "$ICONSET" -o assets/logos/easytv.icns
+          rm -rf "$ICONSET"
+
+      - name: Build packages
+        run: npx --no-install electron-builder ${{ matrix.args }} --publish never
+      - name: Verify macOS architecture
+        if: runner.os == 'macOS'
+        run: |
+          set -e
+          bundle=$(find dist -maxdepth 2 -type d -iname '*.app' -print -quit)
+          test -n "$bundle"
+          executable=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$bundle/Contents/Info.plist")
+          expected='${{ matrix.arch }}'
+          if [ "$expected" = x64 ]; then expected=x86_64; fi
+          lipo "$bundle/Contents/MacOS/$executable" -verify_arch "$expected"
+      - name: Collect packages
+        run: |
+          node scripts/collect-release.js '${{ matrix.platform }}' '${{ matrix.arch }}'
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-${{ matrix.platform }}-${{ matrix.arch }}
+          path: release-assets/*
+          if-no-files-found: error
+          retention-days: 14
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v') && github.event_name == 'push'
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: release-*
+          path: release-assets
+          merge-multiple: true
+      - name: Generate checksums
+        run: |
+          cd release-assets
+          sha256sum * > SHA256SUMS.txt
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" release-assets/* --repo "$GITHUB_REPOSITORY" --verify-tag --draft --generate-notes
